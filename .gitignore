@@ -1,0 +1,27 @@
+# 🔧 Build output
+dist/
+build/
+.vite/
+
+# 🧱 Dependencies
+node_modules/
+
+# ⚙️ Vite & Environment
+.vscode/
+.env
+.env.local
+.env.development
+.env.production
+
+# 💡 OS-specific
+.DS_Store
+Thumbs.db
+
+# 📝 Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🔍 Misc
+*.log
+*.cache
