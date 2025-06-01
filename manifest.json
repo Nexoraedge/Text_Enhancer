@@ -33,7 +33,13 @@
       "suggested_key": {
         "default": "Ctrl+Shift+G"
       },
-      "description": "Enhance the text in the current input field"
+      "description": "Enhance text with Gemini AI"
+    },
+    "custom-prompt": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+O"
+      },
+      "description": "Create custom prompt for Gemini AI"
     }
   }
 }

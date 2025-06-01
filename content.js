@@ -325,10 +325,227 @@ async function enhanceText() {
   );
 }
 
+// Create and show custom prompt popup
+function showCustomPromptPopup() {
+  // Remove any existing popup
+  const existingPopup = document.getElementById('gemini-custom-prompt-popup');
+  if (existingPopup) {
+    existingPopup.remove();
+  }
+
+  // Create popup container
+  const popup = document.createElement('div');
+  popup.id = 'gemini-custom-prompt-popup';
+  popup.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 20px;
+    z-index: 10000;
+    width: 400px;
+    max-width: 90%;
+    font-family: Arial, sans-serif;
+  `;
+
+  // Create popup content
+  const title = document.createElement('h2');
+  title.textContent = 'Custom Gemini Prompt';
+  title.style.cssText = `
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    color: #1a73e8;
+  `;
+
+  const description = document.createElement('p');
+  description.textContent = 'Enter your custom prompt for Gemini AI:';
+  description.style.cssText = `
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #5f6368;
+  `;
+
+  // Get focused element or search box
+  const focusedElement = getFocusedElement();
+  let targetText = '';
+  
+  if (isEditableElement(focusedElement)) {
+    targetText = getTextFromFocusedElement(focusedElement);
+    if (!targetText || targetText.trim() === '') {
+      if (focusedElement.placeholder && focusedElement.placeholder.trim() !== '') {
+        targetText = focusedElement.placeholder;
+      }
+    }
+  } else {
+    // Look for search inputs, prompt areas, etc.
+    const searchInputs = document.querySelectorAll('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"], textarea[placeholder*="prompt"], textarea[placeholder*="Prompt"]');
+    
+    if (searchInputs.length > 0) {
+      targetText = searchInputs[0].value || searchInputs[0].placeholder || '';
+    }
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.placeholder = 'Example: Rewrite this to be more professional';
+  textArea.style.cssText = `
+    width: 100%;
+    height: 80px;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 14px;
+    resize: vertical;
+    box-sizing: border-box;
+  `;
+
+  const targetTextArea = document.createElement('textarea');
+  targetTextArea.value = targetText;
+  targetTextArea.placeholder = 'Text to enhance (will use text from current input field if available)';
+  targetTextArea.style.cssText = `
+    width: 100%;
+    height: 80px;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 14px;
+    resize: vertical;
+    box-sizing: border-box;
+  `;
+
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.cssText = `
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  `;
+
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.cssText = `
+    padding: 8px 16px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background-color: white;
+    color: #5f6368;
+    font-size: 14px;
+    cursor: pointer;
+  `;
+  cancelButton.addEventListener('click', () => {
+    popup.remove();
+  });
+
+  const submitButton = document.createElement('button');
+  submitButton.textContent = 'Generate';
+  submitButton.style.cssText = `
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #1a73e8;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+  `;
+  submitButton.addEventListener('click', () => {
+    const customPrompt = textArea.value.trim();
+    const textToEnhance = targetTextArea.value.trim();
+    
+    if (!customPrompt) {
+      showToast('Please enter a custom prompt', 'error');
+      return;
+    }
+    
+    if (!textToEnhance) {
+      showToast('Please enter text to enhance', 'error');
+      return;
+    }
+    
+    // Show loading state
+    submitButton.disabled = true;
+    submitButton.textContent = 'Generating...';
+    
+    // Send message to background script with custom prompt
+    chrome.runtime.sendMessage(
+      {
+        action: 'enhance-text-with-gemini',
+        text: textToEnhance,
+        context: 'custom',
+        customPrompt: customPrompt
+      },
+      (response) => {
+        if (response && response.success) {
+          // Try to replace text in the focused element
+          if (isEditableElement(focusedElement)) {
+            const success = setTextInFocusedElement(focusedElement, response.enhancedText);
+            
+            if (success) {
+              showToast('Text enhanced and filled in!', 'success');
+              // Also copy to clipboard as a backup
+              copyToClipboard(response.enhancedText, false);
+            } else {
+              // If filling fails, copy to clipboard as fallback
+              copyToClipboard(response.enhancedText, true);
+            }
+          } else {
+            // No editable element, just copy to clipboard
+            copyToClipboard(response.enhancedText, true);
+          }
+          
+          // Remove the popup
+          popup.remove();
+        } else {
+          showToast(
+            response && response.error 
+              ? `Error: ${response.error}` 
+              : 'Failed to enhance text',
+            'error'
+          );
+          
+          // Reset button state
+          submitButton.disabled = false;
+          submitButton.textContent = 'Generate';
+        }
+      }
+    );
+  });
+
+  // Add elements to popup
+  buttonContainer.appendChild(cancelButton);
+  buttonContainer.appendChild(submitButton);
+  
+  popup.appendChild(title);
+  popup.appendChild(description);
+  popup.appendChild(textArea);
+  
+  const targetTextLabel = document.createElement('p');
+  targetTextLabel.textContent = 'Text to enhance:';
+  targetTextLabel.style.cssText = `
+    margin: 15px 0 10px 0;
+    font-size: 14px;
+    color: #5f6368;
+  `;
+  
+  popup.appendChild(targetTextLabel);
+  popup.appendChild(targetTextArea);
+  popup.appendChild(buttonContainer);
+
+  // Add popup to page
+  document.body.appendChild(popup);
+  
+  // Focus the prompt textarea
+  textArea.focus();
+}
+
 // Listen for messages from the background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'enhance-text') {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'enhance-text') {
     enhanceText();
+  } else if (message.action === 'show-custom-prompt') {
+    showCustomPromptPopup();
   }
   return true;
 });

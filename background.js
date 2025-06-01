@@ -1,7 +1,12 @@
 // Background script for Gemini Text Enhancer extension
+
+// Import Google Generative AI library
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Store for the Gemini API instance
+// Default API key for Gemini
+const DEFAULT_API_KEY = 'AIzaSyDa5zBDlmWtrVigdkcvjuhOcSB3TOYo-M8';
+
+// Global variable to store the Gemini API instance
 let genAI = null;
 
 // Initialize the Gemini API with the provided API key
@@ -16,7 +21,12 @@ function initializeGeminiAPI(apiKey) {
 }
 
 // Generate context-aware prompt for text enhancement
-function generatePrompt(text, contextType) {
+function generatePrompt(text, contextType, customPrompt = null) {
+  // If a custom prompt is provided, use it
+  if (customPrompt) {
+    return `${customPrompt}\n\nText to work with:\n"${text}"\n\nYour response (be direct and concise, avoid explanations or formatting):`;
+  }
+  
   const basePrompt = `Enhance the following text to make it more ${contextType === 'general' ? 'clear, professional, and engaging' : ''}.`;
   
   let contextPrompt = '';
@@ -40,11 +50,11 @@ function generatePrompt(text, contextType) {
       contextPrompt = 'Improve the clarity, grammar, and overall quality while maintaining the original meaning and intent.';
   }
   
-  return `${basePrompt}\n\n${contextPrompt}\n\nOriginal text:\n"${text}"\n\nEnhanced text (maintain similar length, don't add unnecessary information):`;
+  return `${basePrompt}\n\n${contextPrompt}\n\nOriginal text:\n"${text}"\n\nEnhanced text (maintain similar length, don't add unnecessary information, be direct and concise):`;
 }
 
 // Enhance text using the Gemini API
-async function enhanceTextWithGemini(apiKey, text, contextType = 'general') {
+async function enhanceTextWithGemini(apiKey, text, contextType = 'general', customPrompt = null) {
   try {
     // Validate API key format
     if (!apiKey || apiKey.trim() === '') {
@@ -63,8 +73,8 @@ async function enhanceTextWithGemini(apiKey, text, contextType = 'general') {
       }
     }
     
-    // Generate model prompt based on context
-    const prompt = generatePrompt(text, contextType);
+    // Generate model prompt based on context or custom prompt
+    const prompt = generatePrompt(text, contextType, customPrompt);
     
     // Get the generative model
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
@@ -74,39 +84,69 @@ async function enhanceTextWithGemini(apiKey, text, contextType = 'general') {
       temperature: 0.7,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 1024
     };
     
-    console.log('Sending request to Gemini API with prompt:', prompt);
+    // Generate content with a timeout
+    const result = await Promise.race([
+      model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timed out')), 15000)
+      )
+    ]);
     
-    // Generate content with timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timed out after 30 seconds')), 30000);
-    });
+    // Extract the enhanced text from the response
+    let enhancedText = result.response.text();
     
-    const generatePromise = model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig,
-    });
-    
-    // Race the promises
-    const result = await Promise.race([generatePromise, timeoutPromise]);
-    const response = await result.response;
-    const enhancedText = response.text().trim();
+    // Clean up the response format
+    enhancedText = cleanResponseFormat(enhancedText);
     
     return enhancedText;
   } catch (error) {
     console.error('Error in enhanceTextWithGemini:', error);
-    
-    // Provide more helpful error messages
-    if (error.message.includes('Failed to fetch')) {
-      throw new Error('Network error: Could not connect to Gemini API. Please check your internet connection and ensure your API key has proper permissions.');
-    } else if (error.message.includes('invalid API key')) {
-      throw new Error('Invalid API key: The API key provided is not valid. Please check your API key in the extension settings.');
-    } else {
-      throw error;
-    }
+    throw error;
   }
+}
+
+// Function to clean up and format Gemini responses
+function cleanResponseFormat(text) {
+  // Remove option headers like "Option 1:" or "Option 1 (Focus on instruction):"
+  text = text.replace(/\*\*Option \d+.*?:\*\*/g, '');
+  
+  // Remove bullet points and asterisks
+  text = text.replace(/\*\s+/g, '');
+  text = text.replace(/\*/g, '');
+  
+  // Remove "Why these are improvements:" and everything after it
+  const improvementsIndex = text.indexOf('Why these are improvements:');
+  if (improvementsIndex !== -1) {
+    text = text.substring(0, improvementsIndex);
+  }
+  
+  // Remove any markdown formatting
+  text = text.replace(/\*\*/g, '');
+  
+  // Remove extra line breaks and trim
+  text = text.replace(/\n{3,}/g, '\n\n');
+  text = text.trim();
+  
+  // If there are multiple paragraphs, just keep the first one as the best answer
+  const paragraphs = text.split('\n\n');
+  if (paragraphs.length > 1) {
+    // Find the longest paragraph that's not a header
+    let bestParagraph = paragraphs[0];
+    for (const para of paragraphs) {
+      if (para.length > bestParagraph.length && !para.includes(':')) {
+        bestParagraph = para;
+      }
+    }
+    text = bestParagraph;
+  }
+  
+  return text;
 }
 
 // Listen for the keyboard shortcut
@@ -118,22 +158,28 @@ chrome.commands.onCommand.addListener((command) => {
         chrome.tabs.sendMessage(tabs[0].id, { action: 'enhance-text' });
       }
     });
+  } else if (command === 'custom-prompt') {
+    // When the custom prompt shortcut is pressed, send a message to the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'show-custom-prompt' });
+      }
+    });
   }
 });
 
-// Listen for messages from content script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'enhance-text-with-gemini') {
-    // Get API key from storage
+// Listen for messages from content scripts or popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'enhance-text-with-gemini') {
     chrome.storage.sync.get(['geminiApiKey'], async (result) => {
       try {
-        const apiKey = result.geminiApiKey;
+        // Use the provided API key or fall back to the default key
+        const apiKey = result.geminiApiKey || DEFAULT_API_KEY;
         
-        if (!apiKey) {
-          throw new Error('Gemini API key not found. Please set it in the extension popup.');
-        }
-
-        const enhancedText = await enhanceTextWithGemini(apiKey, request.text, request.context);
+        console.log('Using API key:', apiKey ? 'Key is set' : 'No key available');
+        
+        // Pass the custom prompt if provided
+        const enhancedText = await enhanceTextWithGemini(apiKey, message.text, message.context, message.customPrompt);
         sendResponse({ success: true, enhancedText });
       } catch (error) {
         console.error('Error enhancing text:', error);
@@ -141,6 +187,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     });
     
-    return true; // Indicates we will send a response asynchronously
+    return true; // Required for async response
   }
 });

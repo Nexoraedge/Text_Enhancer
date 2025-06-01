@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
 function Popup() {
-  const [apiKey, setApiKey] = useState('');
-  const [status, setStatus] = useState('');
+  // Pre-fill with the provided API key
+  const [apiKey, setApiKey] = useState('AIzaSyDa5zBDlmWtrVigdkcvjuhOcSB3TOYo-M8');
+  const [status, setStatus] = useState('API key pre-filled');
   const [activeTab, setActiveTab] = useState('settings');
   const [testText, setTestText] = useState('');
   const [enhancedText, setEnhancedText] = useState('');
