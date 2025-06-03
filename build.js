@@ -32,19 +32,42 @@ try {
 
   iconSizes.forEach(size => {
     const iconPath = path.join(iconDir, `icon${size}.png`);
-    const stats = fs.statSync(iconPath);
-    
-    // If icon file is empty (0 bytes), create a simple colored square
-    if (stats.size === 0) {
-      console.log(`📝 Creating placeholder icon for size ${size}...`);
+    if (fs.existsSync(iconPath)) {
+      const stats = fs.statSync(iconPath);
       
-      // We'll use a simple HTML canvas to create a basic icon
-      // This would normally be done with a graphics library, but for simplicity
-      // we'll just create a placeholder file with some content
-      fs.writeFileSync(iconPath, 'PLACEHOLDER_ICON');
-      console.log(`✅ Created placeholder for icon${size}.png`);
+      // If icon file is empty (0 bytes), create a simple colored square
+      if (stats.size === 0) {
+        console.log(`📝 Creating placeholder icon for size ${size}...`);
+        
+        // We'll use a simple HTML canvas to create a basic icon
+        // This would normally be done with a graphics library, but for simplicity
+        // we'll just create a placeholder file with some content
+        fs.writeFileSync(iconPath, 'PLACEHOLDER_ICON');
+        console.log(`✅ Created placeholder for icon${size}.png`);
+      }
     }
   });
+  
+  // Step 4: Copy content.js and background.js to dist folder
+  console.log('📄 Copying content script and background script...');
+  
+  // Copy content.js
+  if (fs.existsSync('content.js')) {
+    fs.copyFileSync('content.js', path.join('dist', 'content.js'));
+    console.log('✅ Copied content.js to dist folder');
+  } else {
+    console.error('❌ content.js not found!');
+  }
+  
+  // Copy background-bundle.js as background.js
+  if (fs.existsSync('background-bundle.js')) {
+    fs.copyFileSync('background-bundle.js', path.join('dist', 'background.js'));
+    console.log('✅ Copied background-bundle.js to dist folder as background.js');
+  } else {
+    console.error('❌ background-bundle.js not found!');
+  }
+  
+  // We no longer need gemini-api-loader.js since we've bundled the API directly
 
   console.log('✅ Build completed successfully!');
   console.log('\n📋 Next steps:');

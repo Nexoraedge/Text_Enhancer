@@ -2,23 +2,59 @@
 dist/
 build/
 .vite/
+coverage/
 
 # 🧱 Dependencies
 node_modules/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 # ⚙️ Vite & Environment
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
 .env
 .env.local
 .env.development
 .env.production
+*.local
 
 # 💡 OS-specific
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # 📝 Logs
+logs/
+*.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 🔒 Sensitive files
+*.pem
+*.key
+
+# 🧪 Testing
+/cypress/videos/
+/cypress/screenshots/
+
+# Editor directories and files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 yarn-debug.log*
 yarn-error.log*
 

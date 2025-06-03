@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Popup.css';
 
 function Popup() {
   // Pre-fill with the provided API key
@@ -9,6 +10,7 @@ function Popup() {
   const [enhancedText, setEnhancedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [contextType, setContextType] = useState('general');
+  const [includeEmojis, setIncludeEmojis] = useState(false);
 
   useEffect(() => {
     // Load API key from storage when popup opens
@@ -86,14 +88,18 @@ function Popup() {
     setStatus('Enhancing text...');
 
     try {
-      // Create a mock context based on the selected context type
-      const mockContext = getMockContextForType(contextType);
+      // Create a custom prompt if emojis are requested
+      let customPrompt = null;
+      if (includeEmojis) {
+        customPrompt = `Enhance this text in a ${contextType} style. Make it more polished, clear, and effective. Include appropriate emojis for emphasis and emotion throughout the text. Make sure the emojis feel natural and enhance the message.`;
+      }
       
       // Send message to background script
       chrome.runtime.sendMessage({
         action: 'enhance-text-with-gemini',
         text: testText,
-        context: mockContext
+        context: contextType,
+        customPrompt: customPrompt
       }, (response) => {
         setIsProcessing(false);
         
@@ -165,26 +171,29 @@ function Popup() {
 
   return (
     <div className="popup-container">
-      <h1>Gemini Text Enhancer</h1>
+      <div className="popup-header">
+        <h1>Text-Enhancer</h1>
+        <p className="tagline">Style your text with AI</p>
+      </div>
       
       <div className="tabs">
         <button 
           className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
-          Settings
+          <span className="tab-icon">⚙️</span> Settings
         </button>
         <button 
           className={`tab-btn ${activeTab === 'test' ? 'active' : ''}`}
           onClick={() => setActiveTab('test')}
         >
-          Test Enhancer
+          <span className="tab-icon">✨</span> Try It
         </button>
         <button 
           className={`tab-btn ${activeTab === 'help' ? 'active' : ''}`}
           onClick={() => setActiveTab('help')}
         >
-          Help
+          <span className="tab-icon">❓</span> Help
         </button>
       </div>
       
@@ -206,7 +215,12 @@ function Popup() {
           <p className="status-message">{status}</p>
           
           <div className="shortcut-info">
-            <p>Press <strong>Ctrl+G</strong> to enhance text in any input field</p>
+            <h3>Keyboard Shortcuts:</h3>
+            <ul>
+              <li>Press <strong>Ctrl+G</strong> to quickly enhance text in any input field</li>
+              <li>Press <strong>Ctrl+Shift+O</strong> to open the custom prompt popup with templates</li>
+              <li>Press <strong>Ctrl+Shift+H</strong> to open the context-based text generator</li>
+            </ul>
           </div>
         </div>
       )}
@@ -214,29 +228,46 @@ function Popup() {
       {activeTab === 'test' && (
         <div className="tab-content">
           <div className="test-section">
-            <label htmlFor="contextType">Context Type:</label>
-            <select 
-              id="contextType" 
-              value={contextType} 
-              onChange={(e) => setContextType(e.target.value)}
-              disabled={isProcessing}
-            >
-              <option value="general">General</option>
-              <option value="email">Email</option>
-              <option value="social">Social Media</option>
-              <option value="professional">Professional</option>
-              <option value="romantic">Romantic</option>
-              <option value="academic">Academic</option>
-            </select>
+            <div className="option-row">
+              <div className="option-group">
+                <label htmlFor="contextType">Style:</label>
+                <select 
+                  id="contextType" 
+                  value={contextType} 
+                  onChange={(e) => setContextType(e.target.value)}
+                  disabled={isProcessing}
+                  className="styled-select"
+                >
+                  <option value="general">General Professional</option>
+                  <option value="email">Email Communication</option>
+                  <option value="social">Social Media</option>
+                  <option value="professional">Business/Corporate</option>
+                  <option value="romantic">Personal/Friendly</option>
+                  <option value="academic">Academic/Technical</option>
+                </select>
+              </div>
+              
+              <div className="option-group emoji-option">
+                <input
+                  type="checkbox"
+                  id="includeEmojis"
+                  checked={includeEmojis}
+                  onChange={(e) => setIncludeEmojis(e.target.checked)}
+                  disabled={isProcessing}
+                />
+                <label htmlFor="includeEmojis">Include emojis for emotion and emphasis</label>
+              </div>
+            </div>
             
             <label htmlFor="testText">Enter text to enhance:</label>
             <textarea
               id="testText"
               value={testText}
               onChange={(e) => setTestText(e.target.value)}
-              placeholder="Enter your rough text here..."
-              rows="4"
+              placeholder="Enter your text here and we'll make it shine ✨"
+              rows="5"
               disabled={isProcessing}
+              className="styled-textarea"
             />
             
             <button 
@@ -244,7 +275,7 @@ function Popup() {
               disabled={isProcessing || !testText.trim()}
               className="enhance-btn"
             >
-              {isProcessing ? 'Enhancing...' : 'Enhance Text'}
+              {isProcessing ? 'Enhancing...' : '✨ Enhance Text'}
             </button>
             
             {enhancedText && (
@@ -270,28 +301,40 @@ function Popup() {
       {activeTab === 'help' && (
         <div className="tab-content">
           <div className="instructions">
-            <h2>How it works:</h2>
+            <h2>How to Use:</h2>
             <ol>
               <li>Focus on any text input field on a webpage</li>
               <li>Type your rough text</li>
-              <li>Press <strong>Ctrl+G</strong> to enhance your text</li>
+              <li>Press <strong>Ctrl+G</strong> for quick enhancement</li>
+              <li>Or press <strong>Ctrl+Shift+O</strong> for custom prompt options</li>
+              <li>Or press <strong>Ctrl+Shift+H</strong> for context-based text generation</li>
               <li>The enhanced text will replace your original text</li>
             </ol>
             
-            <h2>Context Detection:</h2>
-            <p>The extension automatically detects the context of the webpage to provide appropriate enhancements:</p>
+            <h2>Key Features:</h2>
             <ul>
-              <li><strong>Email:</strong> Professional, clear communication</li>
-              <li><strong>Social Media:</strong> Engaging, concise content</li>
-              <li><strong>Professional:</strong> Formal, achievement-oriented</li>
-              <li><strong>Personal Chat:</strong> Warm, emotionally engaging</li>
-              <li><strong>Academic:</strong> Formal, precise language</li>
+              <li><strong>Quick Enhancement:</strong> Instant text improvement with Ctrl+G</li>
+              <li><strong>Custom Prompts:</strong> Create your own enhancement instructions</li>
+              <li><strong>Context-Based Generation:</strong> Provide context and get humanized text</li>
+              <li><strong>Templates:</strong> Pre-made prompts for common writing styles</li>
+              <li><strong>Freelance Proposals:</strong> Generate professional proposals</li>
+              <li><strong>Tone & Style:</strong> Adjust writing tone with emoji support</li>
+            </ul>
+            
+            <h2>Style Options:</h2>
+            <ul>
+              <li><strong>Email Communication:</strong> Professional, clear messaging</li>
+              <li><strong>Social Media:</strong> Engaging, attention-grabbing content</li>
+              <li><strong>Business/Corporate:</strong> Formal, achievement-oriented</li>
+              <li><strong>Personal/Friendly:</strong> Warm, emotionally engaging</li>
+              <li><strong>Academic/Technical:</strong> Precise, scholarly language</li>
             </ul>
             
             <h2>Troubleshooting:</h2>
             <ul>
-              <li>Make sure your Gemini API key is correctly entered</li>
+              <li>Make sure your API key is correctly entered</li>
               <li>Ensure you're focused on an editable text field</li>
+              <li>If text isn't replaced, check clipboard for the enhanced text</li>
               <li>Try refreshing the page if the extension isn't responding</li>
             </ul>
           </div>

@@ -1,12 +1,14 @@
 {
-  "name": "gemini-text-enhancer",
+  "name": "text-enhancer-ai",
   "private": true,
   "version": "1.0.0",
+  "description": "Style your text with AI - Professional, creative, and personalized text enhancement",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:extension": "node build.js",
+    "postbuild": "node post-build.js",
+    "build:extension": "node build.js && node post-build.js",
     "preview": "vite preview"
   },
   "dependencies": {

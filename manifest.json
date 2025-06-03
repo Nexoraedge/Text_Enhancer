@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Text Enhancer",
+  "name": "Text-Enhancer (AI-powered)",
   "version": "1.0.0",
-  "description": "Enhance your text using Gemini AI with a simple keyboard shortcut",
+  "description": "Style your text with AI - Professional, creative, and personalized text enhancement",
   "permissions": ["activeTab", "storage", "clipboardWrite", "scripting"],
   "host_permissions": ["https://generativelanguage.googleapis.com/"],
   "action": {
@@ -19,9 +19,9 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -31,15 +31,33 @@
   "commands": {
     "enhance-text": {
       "suggested_key": {
-        "default": "Ctrl+Shift+G"
+        "default": "Ctrl+Shift+G",
+        "mac": "Command+Shift+G",
+        "windows": "Ctrl+Shift+G",
+        "chromeos": "Ctrl+Shift+G",
+        "linux": "Ctrl+Shift+G"
       },
-      "description": "Enhance text with Gemini AI"
+      "description": "Enhance text with AI"
     },
     "custom-prompt": {
       "suggested_key": {
-        "default": "Ctrl+Shift+O"
+        "default": "Ctrl+Shift+O",
+        "mac": "Command+Shift+O",
+        "windows": "Ctrl+Shift+O",
+        "chromeos": "Ctrl+Shift+O",
+        "linux": "Ctrl+Shift+O"
       },
-      "description": "Create custom prompt for Gemini AI"
+      "description": "Open custom prompt popup"
+    },
+    "context-enhancer": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H",
+        "windows": "Ctrl+Shift+H",
+        "chromeos": "Ctrl+Shift+H",
+        "linux": "Ctrl+Shift+H"
+      },
+      "description": "Open context-based text generator"
     }
   }
 }
