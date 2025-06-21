@@ -19,7 +19,7 @@ try {
 
   // Step 2: Run the build
   console.log('🔨 Running build...');
-  execSync('npm run build', { stdio: 'inherit' });
+  execSync('vite build', { stdio: 'inherit' });
 
   // Step 3: Copy placeholder icons if they're empty
   console.log('🖼️ Checking icons...');

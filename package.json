@@ -6,14 +6,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "postbuild": "node post-build.js",
-    "build:extension": "node build.js && node post-build.js",
+    "build": "node build.js",
+    "build:extension": "npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.0",
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

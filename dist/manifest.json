@@ -1,84 +1,89 @@
 {
   "manifest_version": 3,
   "name": "Text-Enhancer (AI-powered)",
+  "description": "Style your text with AI. Enhance, rewrite, and generate professional, social, academic, or creative text instantly.",
   "version": "1.0.0",
-  "description": "Style your text with AI - Professional, creative, and personalized text enhancement",
-  "permissions": [
-    "activeTab",
-    "storage",
-    "clipboardWrite",
-    "scripting"
-  ],
-  "host_permissions": [
-    "https://generativelanguage.googleapis.com/"
-  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
-    "default_popup": "index.html",
+    "default_popup": "src/popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
   "background": {
-    "service_worker": "service-worker.js"
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
   },
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "notifications"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "content_scripts": [
     {
-      "js": [
-        "assets/content.js-DZL9YDQK.js"
-      ],
       "matches": [
         "<all_urls>"
-      ]
+      ],
+      "js": [
+        "content.js-loader.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "commands": {
-    "enhance-text": {
+    "quick-enhance": {
       "suggested_key": {
-        "default": "Ctrl+Shift+G",
-        "mac": "Command+Shift+G",
-        "windows": "Ctrl+Shift+G",
-        "chromeos": "Ctrl+Shift+G",
-        "linux": "Ctrl+Shift+G"
+        "default": "Ctrl+Shift+G"
       },
-      "description": "Enhance text with AI"
+      "description": "Quickly enhance selected text"
     },
     "custom-prompt": {
       "suggested_key": {
-        "default": "Ctrl+Shift+O",
-        "mac": "Command+Shift+O",
-        "windows": "Ctrl+Shift+O",
-        "chromeos": "Ctrl+Shift+O",
-        "linux": "Ctrl+Shift+O"
+        "default": "Ctrl+Shift+O"
       },
       "description": "Open custom prompt popup"
     },
-    "context-enhancer": {
+    "context-generator": {
       "suggested_key": {
-        "default": "Ctrl+Shift+H",
-        "mac": "Command+Shift+H",
-        "windows": "Ctrl+Shift+H",
-        "chromeos": "Ctrl+Shift+H",
-        "linux": "Ctrl+Shift+H"
+        "default": "Ctrl+Shift+H"
       },
       "description": "Open context-based text generator"
     }
   },
   "web_accessible_resources": [
     {
+      "resources": [
+        "icons/*",
+        "public/landing.html",
+        "public/landing.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
       "matches": [
         "<all_urls>"
       ],
       "resources": [
-        "assets/content.js-DZL9YDQK.js"
+        "**/*",
+        "*"
       ],
       "use_dynamic_url": false
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "options_page": "src/options/index.html"
 }

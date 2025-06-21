@@ -60,4 +60,17 @@ try {
   console.error('❌ Error updating service worker:', error);
 }
 
+// --- Copy content.js and background.js to dist/ ---
+const filesToCopy = ['content.js', 'background.js'];
+filesToCopy.forEach(file => {
+  const src = path.join(__dirname, file);
+  const dest = path.join(distFolder, file);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dest);
+    console.log(`✅ Copied ${file} to dist/`);
+  } else {
+    console.warn(`⚠️  ${file} not found in project root, not copied.`);
+  }
+});
+
 console.log('✅ Post-build script completed successfully');
