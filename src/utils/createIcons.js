@@ -43,7 +43,7 @@ sizes.forEach(size => {
   const svgContent = createSvgIcon(size);
   fs.writeFileSync(iconPath, svgContent);
   
-  console.log(`Created icon: ${iconPath}`);
+  //console.log(`Created icon: ${iconPath}`);
 });
 
-console.log('Icons created successfully!');
+//console.log('Icons created successfully!');

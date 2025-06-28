@@ -1,12 +1,17 @@
 /* src/popup/Popup.css */
 
-:root {
+@import "../theme.css";
+
+/* removed local :root variables, using shared theme */
+/*
   --primary-color: #a78bfa;
   --primary-dark: #7c3aed;
-  --primary-light: #c4b5fd;
+  --primary-light: #9029e4;
   --text-white: #f3f4f6;
-  --text-light: #d1d5db;
+  --text-light: #4e4e50;
   --text-medium: #9ca3af;
+  --text-black: #151515;
+  --focus-ring: rgba(143, 106, 255, 0.45);
   --bg-dark: #18181b;
   --bg-darker: #131316;
   --bg-card: #232336;
@@ -98,15 +103,15 @@ body {
 
 .tab-btn.active {
   border-bottom-color: var(--primary-color);
-  color: var(--primary-color);
+  color: var(--primary-dark);
   background: var(--bg-dark);
   box-shadow: 0 4px 16px rgba(167,139,250,0.05);
 }
 
 .tab-btn:hover:not(.active), .tab-btn:focus:not(.active) {
   background: var(--bg-card);
-  color: var(--primary-light);
-  border-bottom-color: var(--primary-light);
+  color: var(--primary-dark);
+  border-bottom-color: var(--primary-dark);
 }
 
 .tab-icon {
@@ -133,7 +138,7 @@ body {
   padding: 2px 4px;
 }
 .instructions a:hover, .instructions a:focus {
-  color: #fff;
+  color: var(--primary-dark);
   background: #a78bfa;
   box-shadow: 0 2px 12px rgba(167,139,250,0.16);
   outline: none;

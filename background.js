@@ -163,7 +163,7 @@ async function ensureContentScriptLoaded(tabId) {
   try {
     await chrome.tabs.sendMessage(tabId, { action: 'ping' });
   } catch (error) {
-    console.log('Content script not loaded, injecting...');
+    //console.log('Content script not loaded, injecting...');
     await injectContentScript(tabId);
   }
 }

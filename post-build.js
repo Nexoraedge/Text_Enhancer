@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log('📝 Running post-build script to fix service worker...');
+//console.log('📝 Running post-build script to fix service worker...');
 
 // Path to our custom background script implementation
 const customBackgroundPath = path.join(__dirname, 'background-bundle.js');
@@ -29,13 +29,13 @@ const newServiceWorkerContent = `// Service worker for Text-Enhancer (AI-powered
 ${customBackgroundContent}
 
 // Initialize the service worker
-console.log('Text-Enhancer service worker initialized');`;
+//console.log('Text-Enhancer service worker initialized');`;
 
 
 // Write the new service worker directly to the dist folder
 try {
   fs.writeFileSync(path.join(distFolder, 'service-worker.js'), newServiceWorkerContent);
-  console.log('✅ Created custom service worker in dist folder');
+  //console.log('✅ Created custom service worker in dist folder');
   
   // Update the manifest.json to point to our custom service worker
   const manifestPath = path.join(distFolder, 'manifest.json');
@@ -49,7 +49,7 @@ try {
       delete manifest.background.type;
       
       fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-      console.log('✅ Updated manifest.json to use custom service worker');
+      //console.log('✅ Updated manifest.json to use custom service worker');
     } else {
       console.error('❌ No background section found in manifest.json');
     }
@@ -67,10 +67,10 @@ filesToCopy.forEach(file => {
   const dest = path.join(distFolder, file);
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, dest);
-    console.log(`✅ Copied ${file} to dist/`);
+    //console.log(`✅ Copied ${file} to dist/`);
   } else {
     console.warn(`⚠️  ${file} not found in project root, not copied.`);
   }
 });
 
-console.log('✅ Post-build script completed successfully');
+//console.log('✅ Post-build script completed successfully');

@@ -31,11 +31,11 @@
   ],
   "content_scripts": [
     {
+      "js": [
+        "assets/content.js-Cm1Hgw_p.js"
+      ],
       "matches": [
         "<all_urls>"
-      ],
-      "js": [
-        "content.js-loader.js"
       ],
       "run_at": "document_idle"
     }
@@ -62,22 +62,14 @@
   },
   "web_accessible_resources": [
     {
+      "matches": [
+        "<all_urls>"
+      ],
       "resources": [
         "icons/*",
         "public/landing.html",
-        "public/landing.css"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "resources": [
-        "**/*",
-        "*"
+        "public/landing.css",
+        "assets/content.js-Cm1Hgw_p.js"
       ],
       "use_dynamic_url": false
     }

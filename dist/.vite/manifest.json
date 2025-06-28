@@ -6,13 +6,13 @@
     "isEntry": true
   },
   "background.js": {
-    "file": "assets/background.js-X0rMx0Nu.js",
+    "file": "assets/background.js-mVVFnz2M.js",
     "name": "background.js",
     "src": "background.js",
     "isEntry": true
   },
   "content.js": {
-    "file": "assets/content.js-CP_O1nwg.js",
+    "file": "assets/content.js-Cm1Hgw_p.js",
     "name": "content.js",
     "src": "content.js",
     "isEntry": true
@@ -22,12 +22,12 @@
     "src": "src/options/index.html"
   },
   "src/popup/index.html": {
-    "file": "assets/index.html-BYOVaqiC.js",
+    "file": "assets/index.html-kROVc7vB.js",
     "name": "index.html",
     "src": "src/popup/index.html",
     "isEntry": true,
     "css": [
-      "assets/index-B7lagxen.css"
+      "assets/index-C0n-J6iO.css"
     ]
   }
 }

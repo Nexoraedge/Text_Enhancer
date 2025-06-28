@@ -137,7 +137,7 @@ async function enhanceTextWithGemini(apiKey, text, contextType = 'general', cust
     // Generate the prompt based on the context type
     const prompt = generatePrompt(text, contextType, customPrompt);
     
-    console.log('Sending prompt to Gemini API');
+    //console.log('Sending prompt to Gemini API');
     
     // Build the API request content based on context type
     let apiContent;
@@ -181,7 +181,7 @@ async function enhanceTextWithGemini(apiKey, text, contextType = 'general', cust
     // Clean up the response format
     const cleanedResponse = cleanResponseFormat(responseText, includeEmojis);
     
-    console.log('Received response from Gemini API');
+    //console.log('Received response from Gemini API');
     return cleanedResponse;
   } catch (error) {
     console.error('Error in enhanceTextWithGemini:', error);
@@ -310,7 +310,7 @@ async function ensureContentScriptLoaded(tabId) {
     await chrome.tabs.sendMessage(tabId, { action: 'ping' });
   } catch (error) {
     // If error, content script is not loaded, so inject it
-    console.log('Content script not loaded, injecting...');
+    //console.log('Content script not loaded, injecting...');
     await injectContentScript(tabId);
   }
 }
@@ -322,7 +322,7 @@ async function injectContentScript(tabId, messageToSend = null) {
       target: { tabId },
       files: ['content.js']
     });
-    console.log('Content script injected successfully');
+    //console.log('Content script injected successfully');
     
     // If we have a message to send after injection, send it after a short delay
     if (messageToSend) {
@@ -342,7 +342,7 @@ async function injectContentScript(tabId, messageToSend = null) {
 // Listen for messages from content scripts or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'content_script_ready') {
-    console.log('Content script ready in tab:', sender.tab ? sender.tab.id : 'unknown');
+    //console.log('Content script ready in tab:', sender.tab ? sender.tab.id : 'unknown');
     sendResponse({ status: 'background_ready' });
     return true;
   } else if (message.action === 'ping') {
@@ -355,8 +355,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Use the provided API key or fall back to the default key
         const apiKey = result.geminiApiKey || DEFAULT_API_KEY;
         
-        console.log('Using API key:', apiKey ? 'Key is set' : 'No key available');
-        console.log('Request context:', message.context, 'Include emojis:', message.includeEmojis);
+        //console.log('Using API key:', apiKey ? 'Key is set' : 'No key available');
+        //console.log('Request context:', message.context, 'Include emojis:', message.includeEmojis);
         
         // Pass the custom prompt if provided and include emoji preference
         const enhancedText = await enhanceTextWithGemini(
@@ -378,4 +378,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Log that the background script has loaded
-console.log('Text-Enhancer (AI-powered) background script loaded');
+//console.log('Text-Enhancer (AI-powered) background script loaded');

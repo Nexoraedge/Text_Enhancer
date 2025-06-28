@@ -3,6 +3,28 @@
 // Declare focusedElement at the top for global use
 let focusedElement = null; // Will always be assigned safely before use
 
+// Inject shared theme CSS into the page (once)
+function injectTheme() {
+  try {
+    const href = chrome.runtime.getURL('theme.css');
+    if (!document.querySelector(`link[href="${href}"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.appendChild(link);
+    }
+  } catch (err) {
+    // Fallback for non-extension pages or testing without chrome.*
+    if (!document.querySelector('link[data-text-enhancer-theme]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.dataset.textEnhancerTheme = 'true';
+      link.href = chrome && chrome.runtime && chrome.runtime.getURL ? chrome.runtime.getURL('theme.css') : 'theme.css';
+      document.head.appendChild(link);
+    }
+  }
+}
+
 // Function to detect context type based on URL and page title
 function detectContextType(url, pageTitle) {
   const urlLower = url.toLowerCase();
@@ -346,19 +368,34 @@ async function enhanceText() {
 
 // Add CSS styles to the document
 function addCustomStyles() {
+  injectTheme();
   if (document.getElementById('text-enhancer-styles')) return;
   
   const styleEl = document.createElement('style');
   styleEl.id = 'text-enhancer-styles';
   styleEl.textContent = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+    /* Unified theme variables */
+    :root {
+      --primary-color: #a78bfa;
+      --primary-dark: #7c3aed;
+      --primary-light: #9029e4;
+      --text-white: #f3f4f6;
+      --text-light: #4e4e50;
+      --text-medium: #9ca3af;
+      --bg-dark: #18181b;
+      --bg-darker: #131316;
+      --bg-card: #232336;
+      --border-color: #27272a;
+    }
     
     #text-enhancer-popup {
       position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background-color: white;
+      background-color: #232336;
       border-radius: 12px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
       padding: 0;
@@ -377,7 +414,7 @@ function addCustomStyles() {
       display: flex;
       align-items: center;
       padding: 18px 24px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
       color: white;
       border-top-left-radius: 12px;
       border-top-right-radius: 12px;
@@ -414,8 +451,8 @@ function addCustomStyles() {
     
     #text-enhancer-tabs {
       display: flex;
-      background-color: #f9fafb;
-      border-bottom: 1px solid #e5e7eb;
+      background-color: #1c1c24;
+      border-bottom: 1px solid #27272a;
     }
     
     .text-enhancer-tab {
@@ -425,7 +462,7 @@ function addCustomStyles() {
       border-bottom: 3px solid transparent;
       font-size: 14px;
       font-weight: 500;
-      color: #6b7280;
+      color: #4e4e50;
       cursor: pointer;
       transition: all 0.2s;
       display: flex;
@@ -436,11 +473,11 @@ function addCustomStyles() {
     .text-enhancer-tab.active {
       border-bottom-color: #8b5cf6;
       color: #4f46e5;
-      background-color: rgba(139, 92, 246, 0.05);
+      background-color: rgba(167, 139, 250, 0.05);
     }
     
     .text-enhancer-tab:hover:not(.active) {
-      background-color: #f3f4f6;
+      background-color: #232336;
       color: #4b5563;
     }
     
@@ -474,7 +511,7 @@ function addCustomStyles() {
       margin-bottom: 6px;
       font-size: 14px;
       font-weight: 500;
-      color: #374151;
+      color: #c4b5fd;
     }
     
     .text-enhancer-textarea {
@@ -488,14 +525,14 @@ function addCustomStyles() {
       margin-bottom: 16px;
       font-family: inherit;
       transition: all 0.2s;
-      background-color: #f9fafb;
+      background-color: #1c1c24;
       line-height: 1.5;
     }
     
     .text-enhancer-input:hover,
     .text-enhancer-textarea:hover {
       border-color: #9ca3af;
-      background-color: #ffffff;
+      background-color: #1c1c24;
     }
     
     .text-enhancer-input:focus,
@@ -503,7 +540,7 @@ function addCustomStyles() {
       outline: none;
       border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-      background-color: #ffffff;
+      background-color: #1c1c24;
     }
     
     .text-enhancer-textarea {
@@ -519,7 +556,7 @@ function addCustomStyles() {
       border-radius: 8px;
       font-size: 14px;
       margin-bottom: 16px;
-      background-color: #f9fafb;
+      background-color: #1c1c24;
       cursor: pointer;
       transition: all 0.2s;
       appearance: none;
@@ -531,14 +568,14 @@ function addCustomStyles() {
     
     .text-enhancer-select:hover {
       border-color: #9ca3af;
-      background-color: #ffffff;
+      background-color: #1c1c24;
     }
     
     .text-enhancer-select:focus {
       outline: none;
       border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-      background-color: #ffffff;
+      background-color: #1c1c24;
     }
     
 
@@ -591,16 +628,16 @@ function addCustomStyles() {
     }
     
     .text-enhancer-button-secondary {
-      background-color: white;
+      background-color: #232336;
       border: 1px solid #d1d5db;
       color: #4b5563;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
     
     .text-enhancer-button-secondary:hover {
-      background-color: #f9fafb;
+      background-color: #1c1c24;
       border-color: #9ca3af;
-      color: #374151;
+      color: #c4b5fd;
     }
     
     .text-enhancer-template-card {
@@ -614,7 +651,7 @@ function addCustomStyles() {
     
     .text-enhancer-template-card:hover {
       border-color: #8b5cf6;
-      background-color: #f5f3ff;
+      background-color: #1c1c24;
     }
     
     .text-enhancer-template-title {
@@ -626,7 +663,7 @@ function addCustomStyles() {
     
     .text-enhancer-template-description {
       font-size: 13px;
-      color: #6b7280;
+      color: #4e4e50;
     }
     
     /* Checkbox container styling */
@@ -635,7 +672,7 @@ function addCustomStyles() {
       align-items: center;
       margin: 16px 0;
       padding: 8px 12px;
-      background-color: #f9fafb;
+      background-color: #1c1c24;
       border-radius: 6px;
     }
     
@@ -651,7 +688,7 @@ function addCustomStyles() {
       position: relative;
       cursor: pointer;
       transition: all 0.2s ease;
-      background-color: white;
+      background-color: #232336;
     }
     
     .text-enhancer-checkbox:checked {
@@ -1372,6 +1409,7 @@ function showContextEnhancerPopup() {
 
 // Function to add styles for the context enhancer popup
 function addContextEnhancerStyles() {
+  injectTheme();
   const styleId = 'text-enhancer-context-styles';
   
   // Check if styles already exist
@@ -1542,7 +1580,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  
 
 // Log that the content script has loaded
-console.log('Text-Enhancer (AI-powered) content script loaded');
+//console.log('Text-Enhancer (AI-powered) content script loaded');
 
 // Initialize the extension
 (function() {
@@ -1550,9 +1588,9 @@ console.log('Text-Enhancer (AI-powered) content script loaded');
   try {
     chrome.runtime.sendMessage({ action: 'content_script_ready' }, function(response) {
       if (chrome.runtime.lastError) {
-        console.log('Background script not ready yet:', chrome.runtime.lastError.message);
+        //console.log('Background script not ready yet:', chrome.runtime.lastError.message);
       } else {
-        console.log('Connection with background script established');
+        //console.log('Connection with background script established');
       }
     });
   } catch (error) {

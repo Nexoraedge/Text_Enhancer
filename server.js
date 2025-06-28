@@ -59,7 +59,7 @@ app.post('/api/enhance', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-  console.log(`Open http://localhost:${PORT} to view the landing page.`);
-  console.log(`Open http://localhost:${PORT}/test to test the extension.`);
+  //console.log(`Server running at http://localhost:${PORT}`);
+  //console.log(`Open http://localhost:${PORT} to view the landing page.`);
+  //console.log(`Open http://localhost:${PORT}/test to test the extension.`);
 });

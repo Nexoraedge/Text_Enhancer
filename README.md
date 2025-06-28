@@ -1,17 +1,24 @@
-# Gemini Text Enhancer Chrome Extension
+# Text-Enhancer (AI-Powered) Chrome Extension
+
+Style your text with AI – professional, social, academic or creative in one keystroke.
 
 A Chrome extension built with React and Vite that enhances your text using the Gemini AI API.
 
-## Features
+## ✨ Features
 
-- Enhance text in any input field with a simple keyboard shortcut (Ctrl+G)
+- Quick-enhance: `Ctrl + Shift + G`  
+- Custom prompt window: `Ctrl + Shift + O`  
+- Context generator: `Ctrl + Shift + H`  
+- Context-aware tone selection (email, social, academic, etc.)  
+- Optional emoji preservation  
+- Clipboard backup of every enhanced text
 - Context-aware text improvements based on the website you're using
 - Customizable with your own Gemini API key
 - Works across all websites
 
-## Installation
+## 🚀 Quick Install
 
-### Development Setup
+### From GitHub (Developer build)
 
 1. Clone this repository
 2. Install dependencies:
@@ -27,7 +34,7 @@ A Chrome extension built with React and Vite that enhances your text using the G
    - Enable "Developer mode" in the top-right corner
    - Click "Load unpacked" and select the `dist` folder from this project
 
-### Usage
+### From a ZIP
 
 1. Install the extension in Chrome
 2. Click on the extension icon to open the popup
@@ -36,7 +43,7 @@ A Chrome extension built with React and Vite that enhances your text using the G
 5. Focus on an input field and press `Ctrl+Shift+G` to enhance the text
 6. The enhanced text will replace your original text and be copied to clipboard
 
-### Smart Features
+## 🧠 How It Works
 
 - **Placeholder Text**: If an input field is empty, the extension will use the placeholder text as input
 - **Auto-detection**: Even if no field is focused, the extension will look for search inputs or prompt areas
@@ -48,14 +55,14 @@ A Chrome extension built with React and Vite that enhances your text using the G
 - `npm run dev` - Start the development server
 - `npm run build` - Build the extension for production
 
-## Technical Details
+## ⚙️ Technical Stack
 
 - Built with React and Vite
 - Uses Manifest V3 for Chrome extensions
 - Integrates with Google's Generative AI API (Gemini)
 - Context detection for different platforms
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 ├── public/               # Static assets and manifest
@@ -79,7 +86,7 @@ A Chrome extension built with React and Vite that enhances your text using the G
 └── build.js             # Custom build script
 ```
 
-## How It Works
+## 🏗️ Build & Distribute
 
 1. **Content Script**: Runs on every webpage and listens for the keyboard shortcut (Ctrl+G)
 2. **Background Script**: Handles communication between content script and Gemini API
