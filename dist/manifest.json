@@ -32,7 +32,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content.js-Cm1Hgw_p.js"
+        "assets/content.js-DGPySuys.js"
       ],
       "matches": [
         "<all_urls>"
@@ -58,6 +58,12 @@
         "default": "Ctrl+Shift+H"
       },
       "description": "Open context-based text generator"
+    },
+    "open-main-popup": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A"
+      },
+      "description": "Open main extension popup"
     }
   },
   "web_accessible_resources": [
@@ -69,7 +75,7 @@
         "icons/*",
         "public/landing.html",
         "public/landing.css",
-        "assets/content.js-Cm1Hgw_p.js"
+        "assets/content.js-DGPySuys.js"
       ],
       "use_dynamic_url": false
     }

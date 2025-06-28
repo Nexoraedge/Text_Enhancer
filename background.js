@@ -134,10 +134,16 @@ chrome.commands.onCommand.addListener((command) => {
   const actions = {
     'quick-enhance': { action: 'enhance-text' },
     'custom-prompt': { action: 'show-custom-prompt' },
-    'context-generator': { action: 'show-context-enhancer' }
+    'context-generator': { action: 'show-context-enhancer' },
+    'open-main-popup': { action: 'open-main-popup' }
   };
 
   if (actions[command]) {
+    if (command === 'open-main-popup') {
+      // Directly open the browser action popup
+      chrome.action.openPopup().catch(err => console.error('Failed to open action popup:', err));
+      return;
+    }
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       if (tabs[0]) {
         try {

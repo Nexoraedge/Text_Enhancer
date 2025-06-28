@@ -166,17 +166,32 @@ function getFocusedElement() {
 // Function to check if element is editable
 function isEditableElement(element) {
   if (!element) return false;
-  
+
   const tagName = element.tagName.toLowerCase();
-  const contentEditable = element.getAttribute('contenteditable');
-  
-  return (
-    tagName === 'input' && 
-    ['text', 'search', 'email', 'url', 'tel', 'number', 'password'].includes(element.type)
-  ) || 
-    tagName === 'textarea' || 
-    contentEditable === 'true';
+
+  // Detect native inputs & textareas
+  const isNativeInput = tagName === 'input' &&
+    ['text', 'search', 'email', 'url', 'tel', 'number', 'password'].includes(element.type);
+
+  const isTextArea = tagName === 'textarea';
+
+  // Detect any content-editable surface (attribute may be "", "true", or inherited).
+  const isContentEditable = element.isContentEditable || element.hasAttribute('contenteditable');
+
+  return isNativeInput || isTextArea || isContentEditable;
 }
+
+// Helper: find the closest element with contenteditable="true"
+function findContentEditableAncestor(el) {
+  return el ? el.closest('[contenteditable="true"]') : null;
+}
+
+// Helper: get placeholder-like text from editable elements (supports WhatsApp/Instagram data-placeholder)
+function getPlaceholderFromElement(el) {
+  if (!el) return '';
+  return el.getAttribute('placeholder') || (el.dataset ? el.dataset.placeholder || '' : '');
+}
+
 
 // Function to get the text from the currently focused element
 function getTextFromFocusedElement(element = null) {
@@ -190,10 +205,12 @@ function getTextFromFocusedElement(element = null) {
     
     // Get text based on element type
     if (activeElement.isContentEditable) {
-      return activeElement.innerText || '';
+      const txt = activeElement.innerText || '';
+      return txt.trim() !== '' ? txt : getPlaceholderFromElement(activeElement);
     } else {
       // Get the actual text content from the input or textarea
-      return activeElement.value || '';
+      const txt = activeElement.value || '';
+      return txt.trim() !== '' ? txt : getPlaceholderFromElement(activeElement);
     }
   }
   
@@ -210,9 +227,9 @@ function getTextFromFocusedElement(element = null) {
     // Get the text from the element
     let text = '';
     if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
-      text = element.innerText || '';
+      text = (element.innerText && element.innerText.trim() !== '') ? element.innerText : getPlaceholderFromElement(element);
     } else {
-      text = element.value || '';
+      text = (element.value && element.value.trim() !== '') ? element.value : getPlaceholderFromElement(element);
     }
     
     // If we found an element with text, use it
@@ -265,14 +282,23 @@ function setTextInFocusedElement(element, text) {
     element.dispatchEvent(inputEvent);
     
     return true;
-  } else if (element.getAttribute('contenteditable') === 'true') {
-    element.innerText = text;
-    return true;
+  } else if (element.isContentEditable || element.hasAttribute('contenteditable')) {
+    // Safely inject text into rich-text editors (WhatsApp / Instagram etc.)
+    // without triggering the send action.  We avoid any simulated “Enter” key
+    // press – we only dispatch an InputEvent so React/Vue/etc. notice the
+    // update but leave sending up to the user.
+    const targetEditable = element.isContentEditable ? element : findContentEditableAncestor(element);
+    if (targetEditable) {
+      targetEditable.focus();
+      targetEditable.textContent = text;
+      const inputEvt = new InputEvent('input', { bubbles: true });
+      targetEditable.dispatchEvent(inputEvt);
+      return true;
+    }
   }
   
   return false;
 }
-
 // Function to copy text to clipboard
 function copyToClipboard(text, showNotification = true) {
   navigator.clipboard.writeText(text).then(() => {
@@ -309,8 +335,9 @@ async function enhanceText() {
   if (isEditableElement(focusedElement)) {
     text = getTextFromFocusedElement(focusedElement);
     if (!text || text.trim() === '') {
-      if (focusedElement && focusedElement.placeholder && focusedElement.placeholder.trim() !== '') {
-        text = focusedElement.placeholder;
+      const ph = getPlaceholderFromElement(focusedElement);
+        if (ph.trim() !== '') {
+        text = ph;
         showToast('Using placeholder text: "' + text.substring(0, 20) + (text.length > 20 ? '...' : '') + '"');
       } else {
         showToast('No text to enhance', 'error');

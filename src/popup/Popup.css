@@ -30,15 +30,21 @@
   padding: 0;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
   background: var(--bg-dark);
   color: var(--text-white);
   line-height: 1.5;
-  width: 340px;
+  width: 380px;
 }
 
 .popup-container {
+  padding: 8px;
+  height: 100%;
   width: 100%;
   min-height: 370px;
   background: var(--bg-card);
@@ -189,6 +195,7 @@ body {
   font-weight: 500;
   color: var(--text-light);
 }
+.popup-container { line-height: 1.5; height: min-content  ; width: 380px; padding: 10px; }
 
 .api-key-section input[type="password"], .styled-textarea {
   width: 100%;
@@ -240,18 +247,19 @@ body {
 /* Buttons */
 button {
   padding: 10px 16px;
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
   border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, box-shadow 0.2s, opacity 0.2s;
   border: none;
-  background: var(--primary-color);
   color: var(--text-white);
 }
 
-button:hover:not(:disabled) {
-  background: var(--primary-dark);
+button:hover:not(:disabled), button:focus-visible:not(:disabled) {
+  background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+  box-shadow: 0 2px 14px rgba(167,139,250,0.35);
 }
 
 button:disabled {
