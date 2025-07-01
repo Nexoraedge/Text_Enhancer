@@ -60,12 +60,16 @@ const Popup = () => {
           <div className="instructions">
             <h2>How to Use</h2>
             <ol>
-              <li><strong>Quick Enhance:</strong> Select any text in an input field and press <kbd>Ctrl+Shift+G</kbd> to instantly enhance it.</li>
-              <li><strong>Custom Prompt:</strong> Press <kbd>Ctrl+Shift+O</kbd> to open the custom prompt popup for advanced rewriting and templates.</li>
+              <li><strong>Quick Enhance:</strong> Select any text in an input field and press <kbd>Ctrl+Shift+U</kbd> to instantly enhance it.</li>
+              <li><strong>Custom Prompt:</strong> Press <kbd>Ctrl+Shift+Y</kbd> to open the custom prompt popup for advanced rewriting and templates.</li>
               <li><strong>Context Generator:</strong> Press <kbd>Ctrl+Shift+H</kbd> for context-based AI text generation with humanization and emoji options.</li>
             </ol>
             <h2>Learn More</h2>
-            <a href="../public/landing.html" target="_blank" rel="noopener noreferrer" style={{color:'#a78bfa',textDecoration:'underline'}}>View the full landing page &rarr;</a>
+            <ul style={{listStyle:'disc',paddingLeft:'20px',marginTop:'8px'}}>
+              <li><a href="https://tone-genie.vercel.app/" target="_blank" rel="noopener noreferrer" style={{color:'#a78bfa',textDecoration:'underline'}}>Landing / How-to page ↗</a></li>
+              <li><a href="https://tone-genie.vercel.app/privacy" target="_blank" rel="noopener noreferrer" style={{color:'#a78bfa',textDecoration:'underline'}}>Privacy Policy ↗</a></li>
+              <li><a href="https://tone-genie.vercel.app/feedback" target="_blank" rel="noopener noreferrer" style={{color:'#a78bfa',textDecoration:'underline'}}>Send Feedback ↗</a></li>
+            </ul>
           </div>
         );
       default:

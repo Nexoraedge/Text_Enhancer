@@ -1,4 +1,31 @@
 // Background script for Text-Enhancer (AI-powered) extension
+// -----------------------------------------------------------------------------
+// Website integration (landing/help, privacy, feedback)
+const LANDING_URL = 'https://tone-genie.vercel.app/';
+const PRIVACY_URL = 'https://tone-genie.vercel.app/privacy';
+const FEEDBACK_URL = 'https://tone-genie.vercel.app/feedback';
+
+// Open landing page on install/update and register feedback URL on uninstall
+chrome.runtime.onInstalled.addListener((details) => {
+  // Always try to set uninstall URL – safe to call multiple times
+  chrome.runtime.setUninstallURL(FEEDBACK_URL, () => {
+    if (chrome.runtime.lastError) {
+      console.error('Failed to set uninstall URL:', chrome.runtime.lastError);
+    }
+  });
+
+  try {
+    // Only open landing/help page on fresh install or update (not on browser startup)
+    if (details.reason === 'install') {
+      chrome.tabs.create({ url: LANDING_URL });
+    } else if (details.reason === 'update') {
+      // Append query param so the page can show a friendly "updated" notice if desired
+      chrome.tabs.create({ url: `${LANDING_URL}?updated=1` });
+    }
+  } catch (err) {
+    console.error('Error opening landing page:', err);
+  }
+});
 
 // Google Generative AI library will be loaded via script tag in manifest
 
@@ -69,7 +96,7 @@ async function enhanceTextWithGemini(text, { contextType = 'general', customProm
         ? process.env.NEXT_PUBLIC_API_BASE_URL
         : (typeof window !== 'undefined' && window.NEXT_PUBLIC_API_BASE_URL)
           ? window.NEXT_PUBLIC_API_BASE_URL
-          : 'http://localhost:3000';
+          : 'https://tone-genie.vercel.app';
       let response;
       try {
         response = await fetch(`${apiBaseUrl}/api/enhance`, {

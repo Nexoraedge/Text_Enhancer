@@ -43,25 +43,37 @@
   "commands": {
     "quick-enhance": {
       "suggested_key": {
-        "default": "Ctrl+Shift+G"
+        "default": "Ctrl+Shift+U",
+        "windows": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U",
+        "linux": "Ctrl+Shift+U"
       },
       "description": "Quickly enhance selected text"
     },
     "custom-prompt": {
       "suggested_key": {
-        "default": "Ctrl+Shift+O"
+        "default": "Ctrl+Shift+Y",
+        "windows": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y",
+        "linux": "Ctrl+Shift+Y"
       },
       "description": "Open custom prompt popup"
     },
     "context-generator": {
       "suggested_key": {
-        "default": "Ctrl+Shift+H"
+        "default": "Ctrl+Shift+H",
+        "windows": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H",
+        "linux": "Ctrl+Shift+H"
       },
       "description": "Open context-based text generator"
     },
     "open-main-popup": {
       "suggested_key": {
-        "default": "Ctrl+Shift+A"
+        "default": "Alt+Shift+E",
+        "windows": "Alt+Shift+E",
+        "mac": "Alt+Shift+E",
+        "linux": "Alt+Shift+E"
       },
       "description": "Open main extension popup"
     }

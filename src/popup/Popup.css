@@ -38,8 +38,8 @@ body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
   background: var(--bg-dark);
   color: var(--text-white);
-  line-height: 1.5;
-  width: 380px;
+  line-height: 1.55;
+  width: 400px;
 }
 
 .popup-container {
@@ -76,9 +76,10 @@ body {
   opacity: 0.85;
   color: var(--text-light);
 }
-
+*/
 .tabs {
   display: flex;
+  gap: 8px; 
   background: var(--bg-darker);
   border-bottom: 1px solid var(--border-color);
 }
@@ -237,6 +238,7 @@ body {
   gap: 8px;
   font-size: 14px;
   color: var(--text-light);
+  margin-top: 6px;
 }
 
 .emoji-option input[type="checkbox"] {
@@ -269,6 +271,7 @@ button:disabled {
 }
 
 .enhance-btn {
+  margin-top: 10px;
   align-self: flex-start;
 }
 
@@ -286,6 +289,7 @@ button:disabled {
 
 /* Result & Status */
 .result-section {
+  margin-top: 20px;
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--border-color);

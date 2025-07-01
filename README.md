@@ -6,8 +6,8 @@ A Chrome extension built with React and Vite that enhances your text using the G
 
 ## ✨ Features
 
-- Quick-enhance: `Ctrl + Shift + G`  
-- Custom prompt window: `Ctrl + Shift + O`  
+- Quick-enhance: `Ctrl + Shift + U`  
+- Custom prompt window: `Ctrl + Shift + Y`  
 - Context generator: `Ctrl + Shift + H`  
 - Context-aware tone selection (email, social, academic, etc.)  
 - Optional emoji preservation  
@@ -16,9 +16,23 @@ A Chrome extension built with React and Vite that enhances your text using the G
 - Customizable with your own Gemini API key
 - Works across all websites
 
-## 🚀 Quick Install
+## 🚀 Quick Install  
+*(No coding required – works on Windows, macOS, Linux)*
 
-### From GitHub (Developer build)
+### One-Click ZIP (Recommended)
+Grab the ready-to-use build from the latest release – no build tools needed.
+
+[![Download extension](https://img.shields.io/badge/⬇%20Download%20Text-Enhancer-dist.zip-7c3aed?style=for-the-badge&logo=google-chrome&logoColor=white)](https://github.com/yourusername/text-enhancer/releases/latest/download/dist.zip)
+
+1. Download **`dist.zip`** above and extract it anywhere.
+2. In Chrome/Edge go to `chrome://extensions/` (or `edge://extensions/`).
+3. Enable **Developer mode**.
+4. Click **Load unpacked** and select the extracted `dist` folder.
+5. The “Text-Enhancer” icon will appear – you’re ready to go!
+
+---
+
+### From Source (Developer build)
 
 1. Clone this repository
 2. Install dependencies:
@@ -34,13 +48,38 @@ A Chrome extension built with React and Vite that enhances your text using the G
    - Enable "Developer mode" in the top-right corner
    - Click "Load unpacked" and select the `dist` folder from this project
 
-### From a ZIP
+### Using the Extension
+1. Focus any text box, textarea, or content-editable field.
+2. Press `Ctrl + Shift + U` to enhance the selection instantly.
+3. Need more control?  
+   • `Ctrl + Shift + Y` – open the **Custom Prompt** window.  
+   • `Ctrl + Shift + H` – open **Context Generator** for AI drafting.
+4. All enhanced text is also copied to your clipboard as a backup.
+
+> **Tutorial video / GIF coming soon…**
+
+---
+
+## ❓ Frequently Asked Questions
+
+### Do I need to run a local server if I install from `dist.zip`?
+
+*(ZIP name may appear as `text-enhancer-latest.zip` if you downloaded from the newest release – either works the same)*
+**No.** The bundled background script calls our hosted API at `https://tone-genie.vercel.app/api/enhance` by default.  Everything works out-of-the-box; no servers or terminals required.
+
+### Is a Google Gemini API key required?
+No. The extension already communicates with our backend which holds a secure Gemini key.
+
+• **Casual users** – just install and go.  
+• **Developers / privacy-conscious users** – you can self-host the backend or point the extension to your own endpoint via the `NEXT_PUBLIC_API_BASE_URL` env variable and supply your Gemini key there.
+
+---
 
 1. Install the extension in Chrome
 2. Click on the extension icon to open the popup
-3. Enter your Gemini API key in the settings tab
+3. Enter your Gemini API key in the settings tab (optional)
 4. Navigate to any webpage with text input fields
-5. Focus on an input field and press `Ctrl+Shift+G` to enhance the text
+5. Focus on an input field and press `Ctrl+Shift+U` to enhance the text
 6. The enhanced text will replace your original text and be copied to clipboard
 
 ## 🧠 How It Works
@@ -88,7 +127,7 @@ A Chrome extension built with React and Vite that enhances your text using the G
 
 ## 🏗️ Build & Distribute
 
-1. **Content Script**: Runs on every webpage and listens for the keyboard shortcut (Ctrl+G)
+1. **Content Script**: Runs on every webpage and listens for the keyboard shortcut (`Ctrl + Shift + U`)
 2. **Background Script**: Handles communication between content script and Gemini API
 3. **Popup UI**: Provides interface for API key management and testing
 4. **Context Detection**: Analyzes the current webpage to determine the appropriate enhancement style
