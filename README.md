@@ -22,9 +22,19 @@ A Chrome extension built with React and Vite that enhances your text using the G
 ### One-Click ZIP (Recommended)
 Grab the ready-to-use build from the latest release – no build tools needed.
 
-<a href="https://raw.githubusercontent.com/Nexoraedge/Text_Enhancer/main/downloads/text-enhacer-latest.zip">
+<a href="https://raw.githubusercontent.com/Nexoraedge/Text_Enhancer/main/downloads/text-enhacer-latest_01.zip">
 <span style="color: #87ceeb; font-weight: 600;">Download latest ZIP</span>
 <img src="https://github.com/Nexoraedge/Text_Enhancer/blob/main/public/icons/icon128.png"  title="Download latest ZIP" alt="Download latest ZIP" width="120" /></a>
+
+### 📺 Quick Demo
+
+<div align="center">
+
+<!-- 16:9 video placeholder. Replace `downloads/tut.mp4` with a converted `.gif` or hosted video later -->
+<video src="downloads/tut.mp4" controls style="width:100%; max-width:720px; aspect-ratio:16/9; border:1px solid #555; border-radius:8px;">Sorry, your browser doesn't support embedded videos. You can download the tutorial <a href="downloads/tut.mp4">here</a>.</video>
+
+</div>
+
 
 1. Download **`text-enhacer-latest.zip`** above and extract it anywhere.
 2. In Chrome/Edge go to `chrome://extensions/` (or `edge://extensions/`).

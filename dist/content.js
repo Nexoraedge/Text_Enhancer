@@ -1,5 +1,315 @@
 // Content script for Gemini Text Enhancer extension
 
+// --- Feedback / Review Support ---
+// --- Firebase Web SDK Config (public) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCXVBOKxT_NSKP2yUVufxFr_QImJGApD2E",
+  authDomain: "toneginie.firebaseapp.com",
+  projectId: "toneginie",
+  storageBucket: "toneginie.firebasestorage.app",
+  messagingSenderId: "297868877529",
+  appId: "1:297868877529:web:472296d8ce6311a472e8c8",
+  measurementId: "G-N1QXVS2NZB"
+};
+
+// --- Support messages for review popup ---
+const SUPPORT_MESSAGES = [
+  "✨ Enjoying ToneGenie? A kind review would mean a lot!",
+  "☕ Like the tool? Buy me a coffee & keep it alive!",
+  "💬 Helped you today? A small review goes a long way.",
+  "🪄 Magic happened? Show some love with a quick rating!",
+  "💡 This tool runs on creativity (and a little coffee)!",
+  "🫶 Built this for creators — your feedback fuels updates!",
+  "😄 Smiled while using ToneGenie? Say thanks with a review!",
+  "🚀 Help us grow! Drop a review if it helped you fly.",
+  "🔧 One dev. Many cups of coffee. Support keeps me coding!",
+  "❤️ Liked the vibe? A rating helps more than you think.",
+  "🌟 If this saved your time — rate it, fuel the mission!",
+  "📝 Love ToneGenie? Tap a star & tell the world!",
+  "👀 Still here? Might as well drop a 5-star review 😉",
+  "🌈 Spread good vibes — your review keeps this tool free!",
+  "🔥 This took caffeine, passion & late nights. Show support!",
+  "💻 One-man army here. A review = real motivation 🚀",
+  "🎁 Like a free gift? Help me with a tiny shoutout!",
+  "🤖 AI worked hard. Now give it a little applause 💬",
+  "📢 Love tools like this? Your feedback keeps them alive!",
+  "🥰 Reviews aren’t just stars — they keep solo devs going!",
+  "🙌 If this helped you close a deal, boost the project!",
+  "🔁 Using this often? Pay it forward with a kind review.",
+  "🎯 If this hit the right tone — let the world know!",
+  "😌 Made writing easier today? Consider showing some ❤️",
+  "💬 Sharing is caring — leave feedback to help others!",
+  "🌟 Found it useful? A small review = huge impact!",
+  "🧠 Good AI deserves good vibes. Drop a rating!",
+  "🍀 Feeling lucky this worked? Pay it back with stars!",
+  "🎉 This is free, but your review is priceless!",
+  "👋 Before you go, your 5-star review = fuel for updates!"
+];
+
+function addReviewStyles() {
+  const styleId = 'text-enhancer-review-styles';
+  if (document.getElementById(styleId)) return;
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = `
+    .text-enhancer-review-popup {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 320px;
+      max-width: 95vw;
+      background: #232336;
+      color: #f3f4f6;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      padding: 20px;
+      z-index: 100000;
+      font-family: 'Inter', sans-serif;
+    }
+    .text-enhancer-review-popup h3 {
+      margin-top: 0;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .text-enhancer-stars {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .text-enhancer-star-btn {
+      background: transparent;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #6b7280;
+      transition: color 0.2s;
+    }
+    .text-enhancer-star-btn.active,
+    .text-enhancer-star-btn:hover {
+      color: #facc15;
+    }
+    .text-enhancer-review-popup textarea {
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #1c1c24;
+      color: #f3f4f6;
+      border: 1px solid #3f3f46;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .text-enhancer-review-popup .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .text-enhancer-review-popup button {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+    .text-enhancer-submit-btn { background:#7c3aed; color:#fff; }
+    .text-enhancer-submit-btn:hover { background:#a78bfa; color:#18181b; }
+    .text-enhancer-later-btn { background:#2d2d40; color:#c4b5fd; }
+    .text-enhancer-later-btn:hover { background:#18181b; color:#fff; }
+    @media(max-width:500px){
+      .text-enhancer-review-popup{right:10px;left:10px;bottom:10px;width:auto;}
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+
+  
+// Ensure Firebase SDK is loaded & app initialised once (bundled via Vite)
+let _firebaseInitPromise = null;
+// Dynamically import Firebase (bundled with the extension, no CSP issues)
+function loadFirebase() {
+  if (_firebaseInitPromise) return _firebaseInitPromise;
+
+  _firebaseInitPromise = (async () => {
+    if (window.firebase && window.firebase.apps && window.firebase.apps.length) {
+      return window.firebase; // already initialised
+    }
+
+    // Import compat SDKs – because Vite bundles these, they load from the extension origin.
+    const fb = await import(/* @vite-ignore */ 'firebase/compat/app');
+    await import(/* @vite-ignore */ 'firebase/compat/auth');
+
+    if (!fb.default && fb.initializeApp) {
+      // Named export style (older builds)
+      if (!fb.apps.length) fb.initializeApp(firebaseConfig);
+      return fb;
+    }
+
+    const firebase = fb.default || fb;
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    return firebase;
+  })();
+
+  return _firebaseInitPromise;
+}
+
+function addLoginStyles() {
+  if (document.getElementById('text-enhancer-login-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'text-enhancer-login-styles';
+  style.textContent = `
+    .text-enhancer-login-popup {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 320px;
+      max-width: 95vw;
+      background: #232336;
+      color: #f3f4f6;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      padding: 20px;
+      z-index: 100000;
+      font-family: 'Inter', sans-serif;
+    }
+    .text-enhancer-login-popup h3{margin-top:0;font-size:16px;font-weight:600;margin-bottom:12px;}
+    .text-enhancer-oauth-btn{display:block;width:100%;margin-bottom:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;border:none;cursor:pointer;transition:background 0.2s;}
+    .login-google{background:#4285F4;color:#fff;}
+    .login-github{background:#333;color:#fff;}
+    .login-later{background:#2d2d40;color:#c4b5fd;width:100%;}
+    .text-enhancer-oauth-btn:hover{opacity:0.9;}
+    @media(max-width:500px){.text-enhancer-login-popup{right:10px;left:10px;bottom:10px;width:auto;}}
+  `;
+  document.head.appendChild(style);
+}
+
+function showLoginPopup() {
+  if (document.querySelector('.text-enhancer-login-popup')) return;
+  addLoginStyles();
+
+  const popup = document.createElement('div');
+  popup.className = 'text-enhancer-login-popup';
+
+  const title = document.createElement('h3');
+  title.textContent = 'Sign in to save preferences';
+  popup.appendChild(title);
+
+  const googleBtn = document.createElement('button');
+  googleBtn.className = 'text-enhancer-oauth-btn login-google';
+  googleBtn.textContent = 'Continue with Google';
+  popup.appendChild(googleBtn);
+
+  const githubBtn = document.createElement('button');
+  githubBtn.className = 'text-enhancer-oauth-btn login-github';
+  githubBtn.textContent = 'Continue with GitHub';
+  popup.appendChild(githubBtn);
+
+  const laterBtn = document.createElement('button');
+  laterBtn.className = 'text-enhancer-oauth-btn login-later';
+  laterBtn.textContent = 'Later';
+  popup.appendChild(laterBtn);
+
+  // OAuth handlers
+  async function handleProvider(providerName){
+    try {
+      const fb = await loadFirebase();
+      let provider;
+      if (providerName==='google') provider = new fb.auth.GoogleAuthProvider();
+      else provider = new fb.auth.GithubAuthProvider();
+      const res = await fb.auth().signInWithPopup(provider);
+      const user = res.user;
+      if (user) {
+        const userData = {
+          uid: user.uid,
+          name: user.displayName || 'Anonymous',
+          email: user.email || '',
+          provider: providerName,
+          extVersion: chrome.runtime.getManifest().version,
+          ua: navigator.userAgent
+        };
+        chrome.storage.local.set({ textEnhancerUser: userData });
+        // send to backend
+        fetch('https://tone-genie.vercel.app/api/user', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(userData)
+        }).catch(console.error);
+      }
+      popup.remove();
+    } catch(err){
+      console.error('Login failed', err);
+      // Likely blocked by page CSP – open external login page instead
+      const loginUrl = `https://tone-genie.vercel.app/login?provider=${providerName}`;
+      try {
+        window.open(loginUrl, '_blank');
+      } catch(e){
+        chrome.runtime.sendMessage({ action: 'open_login_tab', url: loginUrl });
+      }
+      showToast('Opening login page…', 'info');
+    }
+  }
+
+  googleBtn.onclick = () => handleProvider('google');
+  githubBtn.onclick = () => handleProvider('github');
+  laterBtn.onclick = () => {
+    // Simply close – skip counter is handled in usage
+    popup.remove();
+  };
+
+  document.body.appendChild(popup);
+}
+
+function incrementUsageCountAndMaybePrompt() {
+  chrome.storage.local.get(
+    ['textEnhancerUsage', 'textEnhancerReviewed', 'textEnhancerUser'],
+    (res) => {
+      let useCount = res.textEnhancerUsage || 0;
+      const reviewed = res.textEnhancerReviewed;
+      const user = res.textEnhancerUser;
+
+
+      useCount += 1;
+
+      // Show login popup every 3 uses *after* the first use
+      if (!user && useCount > 0 && (useCount % 3 === 0)) {
+        showLoginPopup();
+      }
+
+      // Persist counters
+      chrome.storage.local.set({ textEnhancerUsage: useCount });
+
+      // feedback popup logic – every 4 uses after first use
+      if (!reviewed && useCount > 0 && (useCount % 4 === 0)) {
+        showReviewPopup();
+      }
+    }
+  );
+}
+
+
+// (old duplicate block removed)
+/*
+    let count = res.textEnhancerUsage || 0;
+    const reviewed = res.textEnhancerReviewed;
+    const user = res.textEnhancerUser;
+    const skipCount = res.textEnhancerLoginSkipCount || 0;
+    count += 1;
+    chrome.storage.local.set({ textEnhancerUsage: count });
+    // login prompt logic
+    if(!user && !reviewed){
+      if(count === 1 || skipCount >= 2){
+        chrome.storage.local.set({ textEnhancerLoginSkipCount: 0 });
+        showLoginPopup();
+      }
+    }
+    // review prompt logic
+    if(!reviewed && count >= 4){
+      showReviewPopup();
+    }
+  */
 // Declare focusedElement at the top for global use
 let focusedElement = null; // Will always be assigned safely before use
 
@@ -757,6 +1067,7 @@ function addCustomStyles() {
 function showCustomPromptPopup() {
   // Add styles
   addCustomStyles();
+  addContextEnhancerStyles(); // ensure shared popup container styles are available
   
   // Remove any existing popup
   const existingPopup = document.getElementById('text-enhancer-popup');
@@ -767,26 +1078,27 @@ function showCustomPromptPopup() {
   // Create popup container
   const popup = document.createElement('div');
   popup.id = 'text-enhancer-popup';
+  popup.className = 'text-enhancer-context-popup';
 
   // Create header
   const header = document.createElement('div');
-  header.id = 'text-enhancer-header';
+  header.className = 'text-enhancer-popup-header';
   
   const titleContainer = document.createElement('div');
   
   const title = document.createElement('h2');
   title.id = 'text-enhancer-title';
-  title.textContent = 'Text-Enhancer (AI-powered)';
+  title.textContent = 'Tone Genie (AI-powered text enhancer)';
   
   const subtitle = document.createElement('p');
   subtitle.id = 'text-enhancer-subtitle';
-  subtitle.textContent = 'Style your text with AI';
+  subtitle.textContent = 'Enhance your writing style with AI';
   
   titleContainer.appendChild(title);
   titleContainer.appendChild(subtitle);
   
   const closeButton = document.createElement('button');
-  closeButton.id = 'text-enhancer-close';
+  closeButton.className = 'text-enhancer-close-btn';
   closeButton.innerHTML = '&times;';
   closeButton.addEventListener('click', () => popup.remove());
   
@@ -1587,10 +1899,72 @@ function addContextEnhancerStyles() {
   document.head.appendChild(style);
 }
 
+// --- Lightweight fallback overrides ---
+// Replace heavy Firebase/login/review popups with simple redirects
+// Override existing implementations (if any)
+window.showLoginPopup = () => {
+  if (document.querySelector('.text-enhancer-login-simple')) return;
+  const box = document.createElement('div');
+  box.className = 'text-enhancer-login-simple';
+  box.style.cssText = 'position:fixed;bottom:24px;right:24px;width:320px;max-width:95vw;background:#232336;color:#f3f4f6;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.4);padding:18px;z-index:100000;font-family:Inter,sans-serif;';
+  const msg = document.createElement('p');
+  msg.textContent = 'Sign in to sync preferences & get updates';
+  msg.style.margin = '0 0 12px 0';
+  box.appendChild(msg);
+  const actions = document.createElement('div');
+  actions.style.cssText='display:flex;gap:8px;';
+  const later = document.createElement('button');
+  later.textContent = 'Later';
+  later.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#2d2d40;color:#c4b5fd;cursor:pointer;';
+  later.onclick = () => box.remove();
+  const loginBtn = document.createElement('button');
+  loginBtn.textContent = 'Login';
+  loginBtn.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#7c3aed;color:#fff;cursor:pointer;';
+  loginBtn.onclick = () => {
+    window.open('https://tone-genie.vercel.app/login', '_blank');
+    box.remove();
+  };
+  actions.appendChild(later);
+  actions.appendChild(loginBtn);
+  box.appendChild(actions);
+  document.body.appendChild(box);
+};
+function showReviewPopup() {
+  if (document.querySelector('.text-enhancer-feedback-popup')) return;
+  const popup = document.createElement('div');
+  popup.className = 'text-enhancer-feedback-popup';
+  popup.style.cssText = `position:fixed;bottom:24px;right:24px;width:320px;max-width:95vw;background:#232336;color:#f3f4f6;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.4);padding:18px;z-index:100000;font-family:Inter, sans-serif;`;
+
+  const msg = document.createElement('p');
+  msg.textContent = SUPPORT_MESSAGES[Math.floor(Math.random()*SUPPORT_MESSAGES.length)];
+  msg.style.margin='0 0 12px 0';
+  popup.appendChild(msg);
+
+  const btn = document.createElement('button');
+  btn.textContent = 'Leave feedback';
+  btn.style.cssText = 'display:block;width:100%;padding:10px 12px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-weight:600;cursor:pointer;';
+  btn.onclick = () => {
+    // open feedback page
+    window.open('https://tone-genie.vercel.app/feedback', '_blank');
+    chrome.storage.local.set({ textEnhancerReviewed: true });
+    popup.remove();
+  };
+
+  const later = document.createElement('button');
+  later.textContent = 'Later';
+  later.style.cssText='display:block;width:100%;padding:10px 12px;border:none;border-radius:8px;background:#2d2d40;color:#c4b5fd;font-weight:600;cursor:pointer;margin-top:8px;';
+  later.onclick = () => popup.remove();
+  popup.appendChild(btn);
+  popup.appendChild(later);
+
+  document.body.appendChild(popup);
+}
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'enhance-text') {
     enhanceText();
+    incrementUsageCountAndMaybePrompt();
     sendResponse({ success: true });
   } else if (message.action === 'show-custom-prompt') {
     showCustomPromptPopup();
@@ -1623,4 +1997,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } catch (error) {
     console.error('Error sending ready message:', error);
   }
+  // Close the IIFE function wrapper
 })();

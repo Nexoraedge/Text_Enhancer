@@ -1,9 +1,13 @@
 {
   "../../../../@crx/manifest": {
-    "file": "assets/crx-manifest.js-DwWKhmVz.js",
+    "file": "assets/crx-manifest.js-B21WBf1n.js",
     "name": "crx-manifest.js",
     "src": "../../../../@crx/manifest",
     "isEntry": true
+  },
+  "_index.esm2017-c3AR7Od2.js": {
+    "file": "assets/index.esm2017-c3AR7Od2.js",
+    "name": "index.esm2017"
   },
   "background.js": {
     "file": "assets/background.js-D54uZrrx.js",
@@ -12,10 +16,36 @@
     "isEntry": true
   },
   "content.js": {
-    "file": "assets/content.js-DGPySuys.js",
+    "file": "assets/content.js-BnmqFcNm.js",
     "name": "content.js",
     "src": "content.js",
-    "isEntry": true
+    "isEntry": true,
+    "dynamicImports": [
+      "node_modules/firebase/compat/app/dist/esm/index.esm.js",
+      "node_modules/firebase/compat/auth/dist/esm/index.esm.js"
+    ]
+  },
+  "content.js-loader.js": {
+    "file": "assets/content.js-loader-C0tMtfJ9.js",
+    "src": "content.js-loader.js"
+  },
+  "node_modules/firebase/compat/app/dist/esm/index.esm.js": {
+    "file": "assets/index.esm-5dwx-eWw.js",
+    "name": "index.esm",
+    "src": "node_modules/firebase/compat/app/dist/esm/index.esm.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_index.esm2017-c3AR7Od2.js"
+    ]
+  },
+  "node_modules/firebase/compat/auth/dist/esm/index.esm.js": {
+    "file": "assets/index.esm-Dw8aRtCO.js",
+    "name": "index.esm",
+    "src": "node_modules/firebase/compat/auth/dist/esm/index.esm.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_index.esm2017-c3AR7Od2.js"
+    ]
   },
   "src/options/index.html": {
     "file": "assets/index-pvwoH0Is.css",
