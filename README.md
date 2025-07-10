@@ -30,10 +30,11 @@ Grab the ready-to-use build from the latest release – no build tools needed.
 
 <div align="center">
 
-<!-- 16:9 video placeholder. Replace `downloads/tut.mp4` with a converted `.gif` or hosted video later -->
-<video src="downloads/tut.mp4" controls style="width:100%; max-width:720px; aspect-ratio:16/9; border:1px solid #555; border-radius:8px;">Sorry, your browser doesn't support embedded videos. You can download the tutorial <a href="downloads/tut.mp4">here</a>.</video>
+<!-- Animated GIF demo -->
+<img src="downloads/tuto.gif" alt="Quick demo of Text-Enhancer extension" style="width:100%; max-width:720px; border:1px solid #555; border-radius:8px;" />
 
 </div>
+
 
 
 1. Download **`text-enhacer-latest.zip`** above and extract it anywhere.
