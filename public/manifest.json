@@ -1,38 +1,87 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Text Enhancer",
+  "name": "Text-Enhancer (AI-powered)",
+  "description": "Style your text with AI. Enhance, rewrite, and generate professional, social, academic, or creative text instantly.",
   "version": "1.0.0",
-  "description": "Enhance your text using Gemini AI with a simple keyboard shortcut",
-  "permissions": ["activeTab", "storage", "clipboardWrite", "scripting"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "notifications"
+  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
   ],
   "commands": {
-    "enhance-text": {
+    "quick-enhance": {
       "suggested_key": {
-        "default": "Ctrl+G"
+        "default": "Ctrl+Shift+U",
+        "windows": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U",
+        "linux": "Ctrl+Shift+U"
       },
-      "description": "Enhance the text in the current input field"
+      "description": "Quickly enhance selected text"
+    },
+    "custom-prompt": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "windows": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y",
+        "linux": "Ctrl+Shift+Y"
+      },
+      "description": "Open custom prompt popup"
+    },
+    "context-generator": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H",
+        "windows": "Ctrl+Shift+H",
+        "mac": "Command+Shift+H",
+        "linux": "Ctrl+Shift+H"
+      },
+      "description": "Open context-based text generator"
+    },
+    "open-main-popup": {
+      "suggested_key": {
+        "default": "Alt+Shift+E",
+        "windows": "Alt+Shift+E",
+        "mac": "Alt+Shift+E",
+        "linux": "Alt+Shift+E"
+      },
+      "description": "Open main extension popup"
     }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*",
+        "public/icons/*",
+        "public/landing.html",
+        "public/landing.css"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

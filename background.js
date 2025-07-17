@@ -1,5 +1,14 @@
+import { enhanceTextWithGemini } from './src/utils/geminiApi.js';
+import { buildEnhancementPrompt, addEmojiPrompt } from './src/utils/prompts.js';
+
 // Background script for Text-Enhancer (AI-powered) extension
 // -----------------------------------------------------------------------------
+// Default prompt used for Quick Enhance (Ctrl+Shift+U)
+const QUICK_ENHANCE_PROMPT =
+  'Improve the grammar, clarity, and flow of the following text. ' +
+  'Preserve the original tone and intent. Do not add or remove ideas, ' +
+  'and keep the response concise and professional. Return only the revised text.';
+
 // Website integration (landing/help, privacy, feedback)
 const LANDING_URL = 'https://tone-genie.vercel.app/';
 const PRIVACY_URL = 'https://tone-genie.vercel.app/privacy';
@@ -26,135 +35,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     console.error('Error opening landing page:', err);
   }
 });
-
-// Google Generative AI library will be loaded via script tag in manifest
-
-// Global variable to store the Gemini API instance
-let genAI = null;
-
-// Initialize the Gemini API with the provided API key
-function initializeGeminiAPI(apiKey) {
-  try {
-    if (typeof GoogleGenerativeAI === 'undefined') {
-      console.error('GoogleGenerativeAI is not defined. Make sure the library is loaded.');
-      return false;
-    }
-    genAI = new GoogleGenerativeAI(apiKey);
-    return true;
-  } catch (error) {
-    console.error('Failed to initialize Gemini API:', error);
-    genAI = null; // Reset on failure
-    return false;
-  }
-}
-
-// Generate context-aware prompt for text enhancement
-function generatePrompt(text, contextType, customPrompt = null) {
-  if (customPrompt) {
-    return `${customPrompt.trim()}
-
-Text:
-"${text.trim()}"
-
-Only return the improved version. Do not explain, justify, or provide multiple options.`;
-  }
-
-  const contextInstructions = {
-    email: 'Make this suitable for an email. Be clear, concise, and polite.',
-    social: 'Optimize this for social media. Make it engaging, casual, and easy to read.',
-    professional: 'Make this sound professional, polished, and confident.',
-    academic: 'Refine this for academic tone. Use formal language and structure.',
-    romantic: 'Make this sound warm, thoughtful, and emotionally expressive.',
-    general: 'Enhance the clarity, grammar, and tone. Make it clean and professional.',
-  };
-
-  const fallbackInstruction = 'Improve clarity, tone, grammar, and flow.';
-
-  const contextPrompt = contextInstructions[contextType] || fallbackInstruction;
-
-  return `${contextPrompt}
-
-Text:
-"${text.trim()}"
-
-Only return the final improved version. Do not include any introductions, explanations, options, or formatting. Maintain similar length and tone unless clearly needed.`;
-}
-
-// Enhance text using the Gemini API
-async function enhanceTextWithGemini(text, { contextType = 'general', customPrompt = null, includeEmojis = false }) {
-  try {
-    const prompt = generatePrompt(text, contextType, customPrompt);
-    const generationConfig = {
-      temperature: includeEmojis ? 0.8 : 0.7,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 1024
-    };
-    try {
-      // Use environment variable or fallback to localhost:3000
-      const apiBaseUrl = typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_API_BASE_URL
-        ? process.env.NEXT_PUBLIC_API_BASE_URL
-        : (typeof window !== 'undefined' && window.NEXT_PUBLIC_API_BASE_URL)
-          ? window.NEXT_PUBLIC_API_BASE_URL
-          : 'https://tone-genie.vercel.app';
-      let response;
-      try {
-        response = await fetch(`${apiBaseUrl}/api/enhance`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, options: { prompt, generationConfig } })
-        });
-      } catch (fetchError) {
-        throw new Error('Could not connect to backend server. Please make sure the server is running.');
-      }
-      if (!response.ok) {
-        throw new Error(`Failed to enhance text: ${response.statusText}`);
-      }
-      const data = await response.json();
-      if (data.success) {
-        let enhancedText = data.enhancedText;
-        enhancedText = cleanResponseFormat(enhancedText, includeEmojis);
-        return enhancedText;
-      } else {
-        throw new Error(data.error || 'Enhancement failed');
-      }
-    } catch (error) {
-      throw error;
-    }
-  } catch (error) {
-    console.error('Error in enhanceTextWithGemini:', error);
-    throw error;
-  }
-}
-
-// Function to clean up and format Gemini responses
-// Function to clean up and format Gemini responses
-function cleanResponseFormat(text, preserveEmojis = false) {
-  let cleaned = text;
-
-  // Remove introductory phrases and explanations
-  cleaned = cleaned.replace(/^(Okay|Sure|Here|Alright|I've|I'll|I'd|I have|I will|I would|Let me|Here's|Here are|Certainly|Absolutely|Of course|Definitely)\b[^\n]*\n+/i, '');
-  cleaned = cleaned.replace(/^\s*Enhanced Text:\s*/i, '');
-
-  // Remove markdown formatting (bold, italics)
-  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
-  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
-
-  // Remove bullet points and numbering
-  cleaned = cleaned.replace(/^\s*[-*+]\s+/gm, '');
-  cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, '');
-
-  // Remove surrounding quotes
-  cleaned = cleaned.replace(/^["']|["']$/g, '');
-
-  // If not preserving emojis, remove them
-  if (!preserveEmojis) {
-    cleaned = cleaned.replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F700}-\u{1F77F}]|[\u{1F780}-\u{1F7FF}]|[\u{1F800}-\u{1F8FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '');
-  }
-
-  // Trim whitespace
-  return cleaned.trim();
-}
 
 // Listen for keyboard shortcuts
 chrome.commands.onCommand.addListener((command) => {
@@ -231,10 +111,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Route all enhancement requests through the backend proxy
     (async () => {
       try {
-        const enhancedText = await enhanceTextWithGemini(message.text, {
-          contextType: message.contextType || message.context || 'general',
+        // API key no longer required; backend handles authentication.
+        const apiKey = undefined;
+
+        const context = {
+          url: sender.tab ? sender.tab.url : '',
+          title: sender.tab ? sender.tab.title : '',
+        };
+
+        // Construct prompt dynamically to keep tone and apply rules
+        let prompt = buildEnhancementPrompt(message.text, {
+          // existing options
+
           customPrompt: message.customPrompt,
-          includeEmojis: message.includeEmojis || false
+          tone: message.tone,
+          context: message.context,
+          platform: message.platform,
+          action: message.action,
+        });
+        if (message.includeEmojis) {
+          prompt = addEmojiPrompt(prompt);
+        }
+
+        const enhancedText = await enhanceTextWithGemini(apiKey, message.text, {
+          customPrompt: prompt,
+          includeEmojis: false, // already embedded via prompt if requested
+          contextType: message.context || 'general',
         });
         sendResponse({ success: true, enhancedText });
       } catch (error) {
@@ -246,3 +148,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   // Keep other message listeners if any
 });
+  

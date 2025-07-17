@@ -9,7 +9,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "src/popup/index.html",
+    "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -17,8 +17,7 @@
     }
   },
   "background": {
-    "service_worker": "service-worker-loader.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "permissions": [
     "storage",
@@ -28,12 +27,8 @@
   ],
   "content_scripts": [
     {
-      "js": [
-        "assets/content.js-loader-C0tMtfJ9.js"
-      ],
-      "matches": [
-        "<all_urls>"
-      ],
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
@@ -77,23 +72,16 @@
   },
   "web_accessible_resources": [
     {
-      "matches": [
-        "<all_urls>"
-      ],
       "resources": [
         "icons/*",
+        "public/icons/*",
         "public/landing.html",
-        "public/landing.css",
-        "assets/index.esm-5dwx-eWw.js",
-        "assets/index.esm-Dw8aRtCO.js",
-        "assets/index.esm2017-c3AR7Od2.js",
-        "assets/content.js-BnmqFcNm.js"
+        "public/landing.css"
       ],
-      "use_dynamic_url": false
+      "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  },
-  "options_page": "src/options/index.html"
+  }
 }

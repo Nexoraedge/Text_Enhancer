@@ -4,23 +4,16 @@
   "version": "1.0.0",
   "description": "Style your text with AI - Professional, creative, and personalized text enhancement",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "node build.js",
-    "build:extension": "npm run build",
-    "preview": "vite preview"
-  },
+"scripts": {
+  "dev": "vite",
+  "build": "npx vite build && node scripts/copy-popup.js",
+  "preview": "vite preview"
+},
   "dependencies": {
-    "@google/generative-ai": "^0.2.0",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
-    "firebase": "^9.22.2",
-    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.0.0-beta.21",
     "@types/chrome": "^0.0.254",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",

@@ -1,16 +1,6 @@
 // Content script for Gemini Text Enhancer extension
 
-// --- Feedback / Review Support ---
-// --- Firebase Web SDK Config (public) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyCXVBOKxT_NSKP2yUVufxFr_QImJGApD2E",
-  authDomain: "toneginie.firebaseapp.com",
-  projectId: "toneginie",
-  storageBucket: "toneginie.firebasestorage.app",
-  messagingSenderId: "297868877529",
-  appId: "1:297868877529:web:472296d8ce6311a472e8c8",
-  measurementId: "G-N1QXVS2NZB"
-};
+
 
 // --- Support messages for review popup ---
 const SUPPORT_MESSAGES = [
@@ -126,141 +116,6 @@ function addReviewStyles() {
 }
 
 
-  
-// Ensure Firebase SDK is loaded & app initialised once (bundled via Vite)
-let _firebaseInitPromise = null;
-// Dynamically import Firebase (bundled with the extension, no CSP issues)
-function loadFirebase() {
-  if (_firebaseInitPromise) return _firebaseInitPromise;
-
-  _firebaseInitPromise = (async () => {
-    if (window.firebase && window.firebase.apps && window.firebase.apps.length) {
-      return window.firebase; // already initialised
-    }
-
-    // Import compat SDKs – because Vite bundles these, they load from the extension origin.
-    const fb = await import(/* @vite-ignore */ 'firebase/compat/app');
-    await import(/* @vite-ignore */ 'firebase/compat/auth');
-
-    if (!fb.default && fb.initializeApp) {
-      // Named export style (older builds)
-      if (!fb.apps.length) fb.initializeApp(firebaseConfig);
-      return fb;
-    }
-
-    const firebase = fb.default || fb;
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    return firebase;
-  })();
-
-  return _firebaseInitPromise;
-}
-
-function addLoginStyles() {
-  if (document.getElementById('text-enhancer-login-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'text-enhancer-login-styles';
-  style.textContent = `
-    .text-enhancer-login-popup {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 320px;
-      max-width: 95vw;
-      background: #232336;
-      color: #f3f4f6;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-      padding: 20px;
-      z-index: 100000;
-      font-family: 'Inter', sans-serif;
-    }
-    .text-enhancer-login-popup h3{margin-top:0;font-size:16px;font-weight:600;margin-bottom:12px;}
-    .text-enhancer-oauth-btn{display:block;width:100%;margin-bottom:10px;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:500;border:none;cursor:pointer;transition:background 0.2s;}
-    .login-google{background:#4285F4;color:#fff;}
-    .login-github{background:#333;color:#fff;}
-    .login-later{background:#2d2d40;color:#c4b5fd;width:100%;}
-    .text-enhancer-oauth-btn:hover{opacity:0.9;}
-    @media(max-width:500px){.text-enhancer-login-popup{right:10px;left:10px;bottom:10px;width:auto;}}
-  `;
-  document.head.appendChild(style);
-}
-
-function showLoginPopup() {
-  if (document.querySelector('.text-enhancer-login-popup')) return;
-  addLoginStyles();
-
-  const popup = document.createElement('div');
-  popup.className = 'text-enhancer-login-popup';
-
-  const title = document.createElement('h3');
-  title.textContent = 'Sign in to save preferences';
-  popup.appendChild(title);
-
-  const googleBtn = document.createElement('button');
-  googleBtn.className = 'text-enhancer-oauth-btn login-google';
-  googleBtn.textContent = 'Continue with Google';
-  popup.appendChild(googleBtn);
-
-  const githubBtn = document.createElement('button');
-  githubBtn.className = 'text-enhancer-oauth-btn login-github';
-  githubBtn.textContent = 'Continue with GitHub';
-  popup.appendChild(githubBtn);
-
-  const laterBtn = document.createElement('button');
-  laterBtn.className = 'text-enhancer-oauth-btn login-later';
-  laterBtn.textContent = 'Later';
-  popup.appendChild(laterBtn);
-
-  // OAuth handlers
-  async function handleProvider(providerName){
-    try {
-      const fb = await loadFirebase();
-      let provider;
-      if (providerName==='google') provider = new fb.auth.GoogleAuthProvider();
-      else provider = new fb.auth.GithubAuthProvider();
-      const res = await fb.auth().signInWithPopup(provider);
-      const user = res.user;
-      if (user) {
-        const userData = {
-          uid: user.uid,
-          name: user.displayName || 'Anonymous',
-          email: user.email || '',
-          provider: providerName,
-          extVersion: chrome.runtime.getManifest().version,
-          ua: navigator.userAgent
-        };
-        chrome.storage.local.set({ textEnhancerUser: userData });
-        // send to backend
-        fetch('https://tone-genie.vercel.app/api/user', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(userData)
-        }).catch(console.error);
-      }
-      popup.remove();
-    } catch(err){
-      console.error('Login failed', err);
-      // Likely blocked by page CSP – open external login page instead
-      const loginUrl = `https://tone-genie.vercel.app/login?provider=${providerName}`;
-      try {
-        window.open(loginUrl, '_blank');
-      } catch(e){
-        chrome.runtime.sendMessage({ action: 'open_login_tab', url: loginUrl });
-      }
-      showToast('Opening login page…', 'info');
-    }
-  }
-
-  googleBtn.onclick = () => handleProvider('google');
-  githubBtn.onclick = () => handleProvider('github');
-  laterBtn.onclick = () => {
-    // Simply close – skip counter is handled in usage
-    popup.remove();
-  };
-
-  document.body.appendChild(popup);
-}
 
 function incrementUsageCountAndMaybePrompt() {
   chrome.storage.local.get(
@@ -273,10 +128,7 @@ function incrementUsageCountAndMaybePrompt() {
 
       useCount += 1;
 
-      // Show login popup every 3 uses *after* the first use
-      if (!user && useCount > 0 && (useCount % 3 === 0)) {
-        showLoginPopup();
-      }
+   
 
       // Persist counters
       chrome.storage.local.set({ textEnhancerUsage: useCount });
@@ -289,28 +141,6 @@ function incrementUsageCountAndMaybePrompt() {
   );
 }
 
-
-// (old duplicate block removed)
-/*
-    let count = res.textEnhancerUsage || 0;
-    const reviewed = res.textEnhancerReviewed;
-    const user = res.textEnhancerUser;
-    const skipCount = res.textEnhancerLoginSkipCount || 0;
-    count += 1;
-    chrome.storage.local.set({ textEnhancerUsage: count });
-    // login prompt logic
-    if(!user && !reviewed){
-      if(count === 1 || skipCount >= 2){
-        chrome.storage.local.set({ textEnhancerLoginSkipCount: 0 });
-        showLoginPopup();
-      }
-    }
-    // review prompt logic
-    if(!reviewed && count >= 4){
-      showReviewPopup();
-    }
-  */
-// Declare focusedElement at the top for global use
 let focusedElement = null; // Will always be assigned safely before use
 
 // Inject shared theme CSS into the page (once)
@@ -340,6 +170,20 @@ function detectContextType(url, pageTitle) {
   const urlLower = url.toLowerCase();
   const titleLower = pageTitle.toLowerCase();
   
+  // Social media context detection
+  if (
+    urlLower.includes('twitter.com') || 
+    urlLower.includes('instagram.com') ||
+    urlLower.includes('facebook.com') ||
+    urlLower.includes('tiktok.com') ||
+    urlLower.includes('reddit.com') ||
+    titleLower.includes('tweet') ||
+    titleLower.includes('post') ||
+    titleLower.includes('comment')
+  ) {
+    return 'social_media';
+  }
+  
   // Email context detection
   if (
     urlLower.includes('mail.google.com') || 
@@ -351,20 +195,6 @@ function detectContextType(url, pageTitle) {
     titleLower.includes('compose')
   ) {
     return 'email';
-  }
-  
-  // Social media context detection
-  if (
-    urlLower.includes('twitter.com') || 
-    urlLower.includes('facebook.com') || 
-    urlLower.includes('instagram.com') || 
-    urlLower.includes('linkedin.com/feed') || 
-    urlLower.includes('reddit.com') || 
-    titleLower.includes('feed') || 
-    titleLower.includes('post') || 
-    titleLower.includes('timeline')
-  ) {
-    return 'social';
   }
   
   // Professional context detection
@@ -491,6 +321,20 @@ function isEditableElement(element) {
   return isNativeInput || isTextArea || isContentEditable;
 }
 
+// Bundle helper functions for easier consumption elsewhere
+const EditableHelper = {
+  isEditableElement,
+  findContentEditableAncestor,
+  findPlatformEditable,
+  getPlaceholderFromElement,
+  getFocusedElement,
+  getTextFromElement: getTextFromFocusedElement, // alias for clarity
+  setTextInElement: setTextInFocusedElement
+};
+
+// Expose globally (useful for debugging in DevTools)
+window.TextEnhancerEditable = EditableHelper;
+
 // Helper: find the closest element with contenteditable="true"
 function findContentEditableAncestor(el) {
   return el ? el.closest('[contenteditable="true"]') : null;
@@ -499,7 +343,32 @@ function findContentEditableAncestor(el) {
 // Helper: get placeholder-like text from editable elements (supports WhatsApp/Instagram data-placeholder)
 function getPlaceholderFromElement(el) {
   if (!el) return '';
-  return el.getAttribute('placeholder') || (el.dataset ? el.dataset.placeholder || '' : '');
+
+  // 1. Native placeholder attribute (inputs/textarea)
+  const direct = el.getAttribute('placeholder');
+  if (direct) return direct;
+
+  // 2. Data-* placeholder constructs used by many frameworks
+  const ds = el.dataset || {};
+  if (ds) {
+    if (ds.placeholder) return ds.placeholder;
+    if (ds.textPlaceholder) return ds.textPlaceholder;
+  }
+
+  // 3. ARIA labels sometimes use placeholder text
+  const aria = el.getAttribute('aria-label') || el.getAttribute('aria-placeholder');
+  if (aria) return aria;
+
+  // 4. title attribute (fallback)
+  const titleAttr = el.getAttribute('title');
+  if (titleAttr) return titleAttr;
+
+  // 5. WhatsApp / Instagram / Draft.js style: a child span/div with data-placeholder attribute
+  const childPlaceholder = el.querySelector('[data-placeholder]');
+  if (childPlaceholder && childPlaceholder.textContent) return childPlaceholder.textContent.trim();
+
+  // 6. Twitter/X & other React apps sometimes render placeholder in ::before via CSS – not accessible.
+  return '';
 }
 
 
@@ -562,6 +431,90 @@ function getTextFromFocusedElement(element = null) {
   return null;
 }
 
+// Helper: simulate keystroke events (keydown/keyup)
+function dispatchKeystroke(el, key, code, ctrlKey = false) {
+  const opts = { bubbles: true, cancelable: true, key, code, ctrlKey };
+  el.dispatchEvent(new KeyboardEvent('keydown', opts));
+  el.dispatchEvent(new KeyboardEvent('keyup', opts));
+}
+
+// --- Text replacement helpers (generic & Instagram) ---
+function replaceContentEditable(el, newText) {
+  if (!el) return;
+  el.focus();
+  el.innerHTML = '';
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try {
+    document.execCommand('insertText', false, newText);
+  } catch (_) {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', newText);
+    const pasteEvt = new ClipboardEvent('paste', { bubbles: true, clipboardData: dt });
+    el.dispatchEvent(pasteEvt);
+  }
+  el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: newText }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function replaceTwitterEditable(el, newText) {
+  if (!el) return;
+  el.focus();
+  // Clear existing content thoroughly so DraftJS/React state resets
+  // Try execCommand path first
+  document.execCommand('selectAll', false);
+  document.execCommand('delete', false);
+
+  // Additionally fire keystrokes for safety (some builds listen for them)
+  dispatchKeystroke(el, 'a', 'KeyA', true);
+  dispatchKeystroke(el, 'Backspace', 'Backspace');
+
+  // Single insertion
+  const ok = document.execCommand('insertText', false, newText);
+  console.debug('Twitter replace execCommand after clear', ok, el);
+  if (!ok) {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', newText);
+    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+  }
+
+  // Fire input event so React DraftJS syncs internal state
+  el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: newText }));
+
+  console.log('Twitter text injected');
+}
+
+function replaceInstagramEditable(el, newText) {
+  if (!el) return;
+  el.focus();
+  // Select all existing content
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // Clear existing content via real user-like keystrokes so Lexical truly empties
+  dispatchKeystroke(el, 'a', 'KeyA', true); // Ctrl/⌘ + A
+  dispatchKeystroke(el, 'Backspace', 'Backspace');
+
+  // Now insert once via execCommand – Lexical will translate this into its model
+  const ok = document.execCommand('insertText', false, newText);
+  console.debug('Instagram replace execCommand after keystroke clear', ok, el);
+
+  if (!ok) {
+    // As last resort: paste
+    const dt = new DataTransfer();
+    dt.setData('text/plain', newText);
+    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+  }
+
+  console.log('Instagram text injected');
+}
+
 // Function to set text in the focused element
 function setTextInFocusedElement(element, text) {
   if (!element || !isEditableElement(element)) {
@@ -572,8 +525,15 @@ function setTextInFocusedElement(element, text) {
   const selectionStart = element.selectionStart;
   const selectionEnd = element.selectionEnd;
   
+  // ---- Native INPUT / TEXTAREA (covers Twitter/X composer etc.) ----
   if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea') {
-    element.value = text;
+    // Use the native value setter so frameworks (React, Vue, Svelte) detect the change
+    const prototype = element.tagName.toLowerCase() === 'textarea'
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+    const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+    valueSetter.call(element, text);
+    // element.value already set via native setter
     
     // Try to restore cursor position proportionally
     if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
@@ -589,26 +549,92 @@ function setTextInFocusedElement(element, text) {
     
     // Dispatch input event to trigger any listeners
     const inputEvent = new Event('input', { bubbles: true });
+    const changeEvent = new Event('change', { bubbles: true });
+    const keyupEvent = new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter' });
     element.dispatchEvent(inputEvent);
+    element.dispatchEvent(changeEvent);
+    element.dispatchEvent(keyupEvent);
     
     return true;
+  // ---- CONTENTEDITABLE surfaces (WhatsApp, Instagram DM, etc.) ----
   } else if (element.isContentEditable || element.hasAttribute('contenteditable')) {
     // Safely inject text into rich-text editors (WhatsApp / Instagram etc.)
     // without triggering the send action.  We avoid any simulated “Enter” key
     // press – we only dispatch an InputEvent so React/Vue/etc. notice the
     // update but leave sending up to the user.
-    const targetEditable = element.isContentEditable ? element : findContentEditableAncestor(element);
+    let targetEditable = element.isContentEditable ? element : findContentEditableAncestor(element);
+    // WhatsApp Web wraps the editor in two nested spans; ensure we write into the deepest contenteditable if present
+    // Walk down to deepest child (WhatsApp input is nested)
+    if (targetEditable && targetEditable.querySelector('[contenteditable="true"]')) {
+      targetEditable = targetEditable.querySelector('[contenteditable="true"]');
+    }
+    // Also capture the outermost contenteditable ancestor to purge it too
+    let rootEditable = targetEditable;
+    while (rootEditable && rootEditable.parentElement && rootEditable.parentElement.isContentEditable) {
+      rootEditable = rootEditable.parentElement;
+    }
     if (targetEditable) {
-      targetEditable.focus();
-      targetEditable.textContent = text;
-      const inputEvt = new InputEvent('input', { bubbles: true });
-      targetEditable.dispatchEvent(inputEvt);
+      const host = window.location.hostname;
+      // Platform helpers
+      const replaceViaKeystrokes = (el, newText) => {
+        el.focus();
+        dispatchKeystroke(el, 'a', 'KeyA', true); // Ctrl/⌘+A
+        dispatchKeystroke(el, 'Backspace', 'Backspace');
+        // Let the platform editor emit its own input event
+        const dt = new DataTransfer();
+        dt.setData('text/plain', newText);
+        const pasteEvt = new ClipboardEvent('paste', { bubbles: true, clipboardData: dt });
+        el.dispatchEvent(pasteEvt);
+        // Rely on platform to generate insertFromPaste/input events
+      };
+
+      // ----- WhatsApp Web specific path -----
+      if (host.endsWith('whatsapp.com')) {
+        try {
+          replaceViaKeystrokes(targetEditable, text);
+          return true;
+        } catch(err) {
+          console.error('WhatsApp replace failed, falling back:', err);
+        }
+      }
+      if (host.endsWith('instagram.com')) {
+        try {
+          // Instagram uses Lexical editor; target the element with data-lexical-editor if present to avoid duplicate insertion
+          const igEditable = (targetEditable && targetEditable.querySelector('[data-lexical-editor="true"]')) || rootEditable || targetEditable;
+          replaceInstagramEditable(igEditable, text);
+          return true;
+        } catch(err){ console.error('Instagram replace failed', err); }
+      }
+      if (host.endsWith('twitter.com') || host.endsWith('x.com')) {
+        try {
+          const twEditable = (targetEditable && targetEditable.querySelector('[data-testid="tweetTextarea_0"],[role="textbox"][contenteditable="true"]')) || rootEditable || targetEditable;
+          replaceTwitterEditable(twEditable, text);
+          return true;
+        } catch(err){ console.error('Twitter replace failed', err);} 
+      }
+      // ----- Generic contenteditable replacement (other sites) -----
+      if (host.endsWith('instagram.com')) {
+        try {
+          // Instagram DM replacement – use Selection API + explicit events for React sync (debounced)
+          const rootIg = rootEditable || targetEditable;
+          if (!rootIg) {
+            console.warn('[TE] Instagram DM replacement: no editable element found');
+            return false; // let fallback handle
+          }
+          replaceInstagramEditable(rootIg, text);
+          console.log('[TE] Instagram DM replacement via IG helper done');
+          return true;
+        } catch(err){ console.error('Instagram replace failed', err);} 
+      }
+      // ----- Generic contenteditable replacement (other sites) -----
+      replaceContentEditable(rootEditable || targetEditable, text);
       return true;
     }
   }
   
   return false;
 }
+
 // Function to copy text to clipboard
 function copyToClipboard(text, showNotification = true) {
   navigator.clipboard.writeText(text).then(() => {
@@ -1899,36 +1925,7 @@ function addContextEnhancerStyles() {
   document.head.appendChild(style);
 }
 
-// --- Lightweight fallback overrides ---
-// Replace heavy Firebase/login/review popups with simple redirects
-// Override existing implementations (if any)
-window.showLoginPopup = () => {
-  if (document.querySelector('.text-enhancer-login-simple')) return;
-  const box = document.createElement('div');
-  box.className = 'text-enhancer-login-simple';
-  box.style.cssText = 'position:fixed;bottom:24px;right:24px;width:320px;max-width:95vw;background:#232336;color:#f3f4f6;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.4);padding:18px;z-index:100000;font-family:Inter,sans-serif;';
-  const msg = document.createElement('p');
-  msg.textContent = 'Sign in to sync preferences & get updates';
-  msg.style.margin = '0 0 12px 0';
-  box.appendChild(msg);
-  const actions = document.createElement('div');
-  actions.style.cssText='display:flex;gap:8px;';
-  const later = document.createElement('button');
-  later.textContent = 'Later';
-  later.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#2d2d40;color:#c4b5fd;cursor:pointer;';
-  later.onclick = () => box.remove();
-  const loginBtn = document.createElement('button');
-  loginBtn.textContent = 'Login';
-  loginBtn.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#7c3aed;color:#fff;cursor:pointer;';
-  loginBtn.onclick = () => {
-    window.open('https://tone-genie.vercel.app/login', '_blank');
-    box.remove();
-  };
-  actions.appendChild(later);
-  actions.appendChild(loginBtn);
-  box.appendChild(actions);
-  document.body.appendChild(box);
-};
+
 function showReviewPopup() {
   if (document.querySelector('.text-enhancer-feedback-popup')) return;
   const popup = document.createElement('div');
@@ -1959,6 +1956,191 @@ function showReviewPopup() {
 
   document.body.appendChild(popup);
 }
+
+
+// function addFloatingButtonStyles() {
+//   const id = 'text-enhancer-floating-styles';
+//   if (document.getElementById(id)) return;
+//   const style = document.createElement('style');
+//   style.id = id;
+//   style.textContent = `
+//     .te-fab{position:absolute; color:#fff;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#542097,#131317,#3C3C6D);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2147483647;box-shadow:0 2px 6px rgba(0,0,0,0.3);}
+//     .te-fab img{width:18px;height:18px;}
+//     .te-menu{position:absolute;min-width:140px;background:#232336;color:#f3f4f6;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.35);padding:6px 0;z-index:2147483647;display:none;font-family:Inter,sans-serif;}
+//     .te-menu.open{display:block;}
+//     .te-menu button{width:100%;background:none;border:none;color:#f3f4f6;text-align:left;padding:8px 12px;font-size:13px;cursor:pointer;transition:background 0.2s;}
+//     .te-menu button:hover{background:#3b3b4d;}
+//   `;
+//   document.head.appendChild(style);
+// }
+
+// --- Floating button / menu implementation ---
+let teFabEl = null; // floating button element
+let teMenuEl = null; // menu element
+let teTargetEl = null; // currently focused editable element
+const originalTextMap = new WeakMap(); // store original text per element for revert
+
+// --- Platform-specific editable selectors ---
+// Map of domains to selectors for their main text inputs/editors
+const platformHandlers = {
+  // Updated selector: try DM composer textbox specifically, fallback to any contenteditable
+  'instagram.com': { selector: 'div[role="textbox"][contenteditable="true"][aria-describedby="Message"], div[role="textbox"][contenteditable="true"][aria-label="Message"], div[role="textbox"][contenteditable="true"][data-testid="DMComposerTextInput"], div[role="textbox"][contenteditable="true"]' },
+  'twitter.com':   { selector: '[data-testid="tweetTextarea_0"], div[contenteditable="true"][role="textbox"]' },
+  'web.whatsapp.com': { selector: '[contenteditable="true"][data-tab][data-tab!="1"]' },
+  // Generic fallback for all other sites
+  '*': { selector: 'textarea, input[type="text"], input[role="textbox"], [contenteditable=""], [contenteditable="true"], div[role="textbox"]' }
+};
+
+// Helper: given a DOM node, attempt to find an editable element based on platform-specific selectors
+function findPlatformEditable(node) {
+  const host = window.location.hostname;
+  let matched = false;
+  for (const domain in platformHandlers) {
+    if (domain !== '*' && host.endsWith(domain)) {
+      matched = true;
+      const sel = platformHandlers[domain].selector;
+      // Try closest match first (to handle nested clicks)
+      const closestMatch = node && node.closest ? node.closest(sel) : null;
+      if (closestMatch) return closestMatch;
+      // Fallback to first visible match on page
+      const anyMatch = document.querySelector(sel);
+      if (anyMatch) return anyMatch;
+    }
+  }
+  // No specific handler match – use generic fallback
+  if (!matched) {
+    const genericSel = platformHandlers['*'].selector;
+    const closest = node && node.closest ? node.closest(genericSel) : null;
+    if (closest) return closest;
+    const anyGeneric = document.querySelector(genericSel);
+    if (anyGeneric) return anyGeneric;
+  }
+  return null;
+}
+
+// function createFab(targetEl){
+//   addFloatingButtonStyles();
+//   // remove existing fab/menu
+//   removeFab();
+//   teTargetEl = targetEl;
+
+//   const rect = targetEl.getBoundingClientRect();
+//   teFabEl = document.createElement('div');
+//   teFabEl.className='te-fab';
+//   teFabEl.style.top = `${rect.top + window.scrollY + 4}px`;
+//   teFabEl.style.left = `${rect.right + window.scrollX - 36}px`;
+
+//   // Use extension icon if available, else plus sign
+//   const img = document.createElement('img');
+//   try{img.src = chrome.runtime.getURL('icons/logo.png');}catch(e){}
+//   if(img.src){teFabEl.appendChild(img);}else{teFabEl.textContent='✎';}
+
+//   // Create menu
+//   teMenuEl = document.createElement('div');
+//   teMenuEl.className='te-menu';
+//   const actions = [
+//     {id:'quick',label:'Quick Enhance',handler:quickEnhanceAction},
+//     {id:'context',label:'Context Enhance',handler:()=>{showContextEnhancerPopup();hideMenu();}},
+//     {id:'prompt',label:'Custom Prompt',handler:()=>{showCustomPromptPopup();hideMenu();}},
+//     {id:'revert',label:'Revert',handler:revertAction}
+//   ];
+//   actions.forEach(a=>{
+//     const btn=document.createElement('button');
+//     btn.textContent=a.label;
+//     btn.onclick=(ev)=>{ev.stopPropagation(); a.handler();};
+//     teMenuEl.appendChild(btn);
+//   });
+//   document.body.appendChild(teFabEl);
+//   document.body.appendChild(teMenuEl);
+
+//   // Position menu below the fab
+//   const menuRect = {top: rect.top + window.scrollY + 40, left: rect.right + window.scrollX - 140};
+//   teMenuEl.style.top = `${menuRect.top}px`;
+//   teMenuEl.style.left = `${menuRect.left}px`;
+
+//   teFabEl.addEventListener('click', (ev)=>{ev.stopPropagation(); toggleMenu();});
+// }
+
+// function toggleMenu(){
+//   if(!teMenuEl) return;
+//   const isOpen = teMenuEl.classList.toggle('open');
+//   // Fallback inline display in case host page CSS interferes
+//   teMenuEl.style.display = isOpen ? 'block' : 'none';
+// }
+// function hideMenu(){ if(teMenuEl){ teMenuEl.classList.remove('open'); teMenuEl.style.display='none'; }}
+// function removeFab(){
+//   if(teFabEl){teFabEl.remove();teFabEl=null;}
+//   if(teMenuEl){teMenuEl.remove();teMenuEl=null;}
+// }
+
+function quickEnhanceAction(){
+  if(!teTargetEl)return;
+  const txt = getTextFromFocusedElement(teTargetEl) || '';
+  originalTextMap.set(teTargetEl, txt);
+  hideMenu();
+  // ensure target is focused for enhanceText flow
+  teTargetEl.focus();
+  enhanceText();
+}
+function revertAction(){
+  if(!teTargetEl)return;
+  const orig = originalTextMap.get(teTargetEl);
+  if(orig!==undefined){
+    setTextInFocusedElement(teTargetEl, orig);
+    showToast('Reverted to original text','info');
+  } else {
+    showToast('No original text stored','error');
+  }
+}
+
+// Handle focus events to show fab
+function handleFocusIn(e){
+  let tgt = e.target;
+  if (!isEditableElement(tgt)) {
+    // Try platform-specific fallback
+    const plat = findPlatformEditable(tgt);
+    if (plat) tgt = plat;
+  }
+  if (isEditableElement(tgt)) {
+    createFab(tgt);
+  } else {
+    removeFab();
+  }
+}
+
+// Some web apps (e.g., WhatsApp Web, Twitter) prevent normal focus events on their
+// rich editors.  As a fallback we also listen for click events and look for the
+// nearest editable ancestor.
+function handleClickEditable(e) {
+  // If a menu or the fab itself was clicked, ignore.
+  if (teFabEl && (teFabEl.contains(e.target) || (teMenuEl && teMenuEl.contains(e.target)))) {
+    return;
+  }
+
+  let candidate = isEditableElement(e.target) ? e.target : findContentEditableAncestor(e.target);
+  if (!candidate) {
+    candidate = findPlatformEditable(e.target);
+  }
+  if (candidate) {
+    createFab(candidate);
+  } else {
+    removeFab();
+  }
+}
+
+// function handleClickOutside(e){
+//   if(teFabEl && !teFabEl.contains(e.target) && teMenuEl && !teMenuEl.contains(e.target)){
+//     hideMenu();
+//   }
+// }
+
+// Floating FAB/menu disabled for now. Re-enable by restoring listeners below.
+// document.addEventListener('focusin', handleFocusIn, true);
+// document.addEventListener('blur', removeFab, true);
+// document.addEventListener('click', handleClickOutside, true);
+// document.addEventListener('click', handleClickEditable, true);
+
+// ------------ END Floating Mini-Popup UI -------------
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
