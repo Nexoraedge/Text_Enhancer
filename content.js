@@ -489,40 +489,21 @@ function replaceTwitterEditable(el, newText) {
     sel.addRange(range);
     document.execCommand('delete');
 
-    // Extra hard reset
-    el.innerText = '';
+        // --- Robust insertion via synthetic paste ---
+    const dt = new DataTransfer();
+    dt.setData('text/plain', newText);
+    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
 
-    // Draft-JS needs real beforeinput / input events to update internal state
-    let handled = false;
-    const beforeEvt = new InputEvent('beforeinput', {
-      inputType: 'insertFromPaste',
-      data: newText,
-      bubbles: true,
-      cancelable: true
-    });
-    handled = !el.dispatchEvent(beforeEvt) ? true : handled;
-
-    // Update DOM to match
-    el.textContent = newText;
-
-    const inputEvt = new InputEvent('input', {
-      inputType: 'insertFromPaste',
-      data: newText,
-      bubbles: true
-    });
-    el.dispatchEvent(inputEvt);
-
-    if (!handled) {
-      // Fallback: execCommand or synthetic paste if beforeinput not accepted
-      const ok = document.execCommand('insertText', false, newText);
-      if (!ok) {
-        const dt = new DataTransfer();
-        dt.setData('text/plain', newText);
-        el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+    // DraftJS usually handles the paste and updates its state. Give it a tick.
+    setTimeout(() => {
+      // Ensure value shows (if not already)
+      if (el.innerText.trim() !== newText.trim()) {
+        el.innerText = newText;
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: newText }));
       }
-    }
+    }, 0);
 
-    // Blur/focus trick to ensure React commits value
+    // Blur/focus trick to force React commit
     el.blur();
     setTimeout(() => el.focus(), 0);
 

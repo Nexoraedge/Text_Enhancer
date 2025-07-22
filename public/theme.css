@@ -1,0 +1,11 @@
+/* Text-Enhancer shared theme – minimal fallback to satisfy Chrome review */
+:root {
+  --te-bg: #1c1c24;
+  --te-fg: #f3f4f6;
+  --te-accent: #7c3aed;
+}
+
+.text-enhancer-theme {
+  background: var(--te-bg);
+  color: var(--te-fg);
+}
