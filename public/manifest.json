@@ -9,7 +9,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "popup/index.html",
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -22,8 +22,7 @@
   "permissions": [
     "storage",
     "scripting",
-    "activeTab",
-    "notifications"
+    "activeTab"
   ],
   "content_scripts": [
     {
@@ -74,9 +73,7 @@
     {
       "resources": [
         "icons/*",
-        "public/icons/*",
-        "public/landing.html",
-        "public/landing.css"
+        "public/icons/*"
       ],
       "matches": ["<all_urls>"]
     }

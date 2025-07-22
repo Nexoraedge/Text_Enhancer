@@ -1,7 +1,3 @@
-// Content script for Gemini Text Enhancer extension
-
-
-
 // --- Support messages for review popup ---
 const SUPPORT_MESSAGES = [
   "✨ Enjoying ToneGenie? A kind review would mean a lot!",
@@ -115,8 +111,6 @@ function addReviewStyles() {
   document.head.appendChild(style);
 }
 
-
-
 function incrementUsageCountAndMaybePrompt() {
   chrome.storage.local.get(
     ['textEnhancerUsage', 'textEnhancerReviewed', 'textEnhancerUser'],
@@ -144,6 +138,29 @@ function incrementUsageCountAndMaybePrompt() {
 let focusedElement = null; // Will always be assigned safely before use
 
 // Inject shared theme CSS into the page (once)
+function injectPlaceholderStyles(){
+  const id='text-enhancer-placeholder-styles';
+  if(document.getElementById(id)) return;
+  const style=document.createElement('style');
+  style.id=id;
+  style.textContent=`
+    /* Ensure textarea/input in pop-ups always use white text on black background */
+    .text-enhancer-textarea,
+    textarea.text-enhancer-textarea,
+    input.text-enhancer-input {
+      color:#ffffff !important;
+      background:#000000 !important;
+    }
+    .text-enhancer-textarea::placeholder,
+    textarea.text-enhancer-textarea::placeholder,
+    input.text-enhancer-input::placeholder {
+      color:#ffffff !important;
+      opacity:0.8;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function injectTheme() {
   try {
     const href = chrome.runtime.getURL('theme.css');
@@ -172,7 +189,7 @@ function detectContextType(url, pageTitle) {
   
   // Social media context detection
   if (
-    urlLower.includes('twitter.com') || 
+    urlLower.includes('x.com') || 
     urlLower.includes('instagram.com') ||
     urlLower.includes('facebook.com') ||
     urlLower.includes('tiktok.com') ||
@@ -461,31 +478,62 @@ function replaceContentEditable(el, newText) {
 }
 
 function replaceTwitterEditable(el, newText) {
-  if (!el) return;
-  el.focus();
-  // Clear existing content thoroughly so DraftJS/React state resets
-  // Try execCommand path first
-  document.execCommand('selectAll', false);
-  document.execCommand('delete', false);
+  if (!el) return false;
+  try {
+    el.focus();
+    // Select all & delete to fully clear DraftJS state
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('delete');
 
-  // Additionally fire keystrokes for safety (some builds listen for them)
-  dispatchKeystroke(el, 'a', 'KeyA', true);
-  dispatchKeystroke(el, 'Backspace', 'Backspace');
+    // Extra hard reset
+    el.innerText = '';
 
-  // Single insertion
-  const ok = document.execCommand('insertText', false, newText);
-  console.debug('Twitter replace execCommand after clear', ok, el);
-  if (!ok) {
-    const dt = new DataTransfer();
-    dt.setData('text/plain', newText);
-    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+    // Draft-JS needs real beforeinput / input events to update internal state
+    let handled = false;
+    const beforeEvt = new InputEvent('beforeinput', {
+      inputType: 'insertFromPaste',
+      data: newText,
+      bubbles: true,
+      cancelable: true
+    });
+    handled = !el.dispatchEvent(beforeEvt) ? true : handled;
+
+    // Update DOM to match
+    el.textContent = newText;
+
+    const inputEvt = new InputEvent('input', {
+      inputType: 'insertFromPaste',
+      data: newText,
+      bubbles: true
+    });
+    el.dispatchEvent(inputEvt);
+
+    if (!handled) {
+      // Fallback: execCommand or synthetic paste if beforeinput not accepted
+      const ok = document.execCommand('insertText', false, newText);
+      if (!ok) {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', newText);
+        el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+      }
+    }
+
+    // Blur/focus trick to ensure React commits value
+    el.blur();
+    setTimeout(() => el.focus(), 0);
+
+    console.debug('[TE] Twitter replacement done');
+    return true;
+  } catch (err) {
+    console.error('[TE] Twitter replacement error', err);
+    return false;
   }
-
-  // Fire input event so React DraftJS syncs internal state
-  el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: newText }));
-
-  console.log('Twitter text injected');
 }
+
 
 function replaceInstagramEditable(el, newText) {
   if (!el) return;
@@ -515,8 +563,61 @@ function replaceInstagramEditable(el, newText) {
   console.log('Instagram text injected');
 }
 
+// Show copy notification
+function showCopyNotification() {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+    z-index: 2147483647;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  `;
+  notification.innerHTML = '✅ Copied to clipboard!';
+  
+  document.body.appendChild(notification);
+  
+  // Animate in
+  requestAnimationFrame(() => {
+    notification.style.opacity = '1';
+    notification.style.transform = 'translateX(0)';
+  });
+  
+  // Remove after 3 seconds
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 3000);
+}
+
 // Function to set text in the focused element
-function setTextInFocusedElement(element, text) {
+function setTextInFocusedElement(element, text, params = null) {
+  // Ensure params object exists so regenerate has something meaningful
+  if (!params) {
+    params = { action: 'enhance-text-with-gemini', context: 'general' };
+  }
+  // Cache original text for revert/regenerate if not already stored
+  if (element && !originalTextMap.has(element)) {
+    const orig = getTextFromElement(element);
+    originalTextMap.set(element, { text: orig, params });
+  }
   if (!element || !isEditableElement(element)) {
     return false;
   }
@@ -555,6 +656,7 @@ function setTextInFocusedElement(element, text) {
     element.dispatchEvent(changeEvent);
     element.dispatchEvent(keyupEvent);
     
+    renderActionBar(element);
     return true;
   // ---- CONTENTEDITABLE surfaces (WhatsApp, Instagram DM, etc.) ----
   } else if (element.isContentEditable || element.hasAttribute('contenteditable')) {
@@ -592,6 +694,7 @@ function setTextInFocusedElement(element, text) {
       if (host.endsWith('whatsapp.com')) {
         try {
           replaceViaKeystrokes(targetEditable, text);
+          renderActionBar(element);
           return true;
         } catch(err) {
           console.error('WhatsApp replace failed, falling back:', err);
@@ -602,13 +705,15 @@ function setTextInFocusedElement(element, text) {
           // Instagram uses Lexical editor; target the element with data-lexical-editor if present to avoid duplicate insertion
           const igEditable = (targetEditable && targetEditable.querySelector('[data-lexical-editor="true"]')) || rootEditable || targetEditable;
           replaceInstagramEditable(igEditable, text);
+          renderActionBar(element);
           return true;
         } catch(err){ console.error('Instagram replace failed', err); }
       }
       if (host.endsWith('twitter.com') || host.endsWith('x.com')) {
         try {
-          const twEditable = (targetEditable && targetEditable.querySelector('[data-testid="tweetTextarea_0"],[role="textbox"][contenteditable="true"]')) || rootEditable || targetEditable;
+          const twEditable = (targetEditable && targetEditable.querySelector('[data-testid="tweetTextarea_0"],div[role="textbox"]')) || rootEditable || targetEditable;
           replaceTwitterEditable(twEditable, text);
+          renderActionBar(element);
           return true;
         } catch(err){ console.error('Twitter replace failed', err);} 
       }
@@ -622,18 +727,22 @@ function setTextInFocusedElement(element, text) {
             return false; // let fallback handle
           }
           replaceInstagramEditable(rootIg, text);
+          renderActionBar(element);
           console.log('[TE] Instagram DM replacement via IG helper done');
           return true;
         } catch(err){ console.error('Instagram replace failed', err);} 
       }
       // ----- Generic contenteditable replacement (other sites) -----
       replaceContentEditable(rootEditable || targetEditable, text);
+      renderActionBar(element);
       return true;
     }
   }
   
   return false;
 }
+
+
 
 // Function to copy text to clipboard
 function copyToClipboard(text, showNotification = true) {
@@ -860,7 +969,10 @@ function addCustomStyles() {
     }
     
     .text-enhancer-tab-content.active {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    
     }
     
     /* Fix for text visibility in tabs */
@@ -878,7 +990,8 @@ function addCustomStyles() {
     }
     
     .text-enhancer-textarea {
-      width: 100%;
+    color:#fff; 
+      width: auto;
       padding: 12px 14px;
       border: 1px solid #d1d5db;
       border-radius: 8px;
@@ -888,7 +1001,7 @@ function addCustomStyles() {
       margin-bottom: 16px;
       font-family: inherit;
       transition: all 0.2s;
-      background-color: #1c1c24;
+      background-color: #000;
       line-height: 1.5;
     }
     
@@ -1093,7 +1206,7 @@ function addCustomStyles() {
 function showCustomPromptPopup() {
   // Add styles
   addCustomStyles();
-  addContextEnhancerStyles(); // ensure shared popup container styles are available
+  addContextEnhancerStyles();
   
   // Remove any existing popup
   const existingPopup = document.getElementById('text-enhancer-popup');
@@ -1101,32 +1214,37 @@ function showCustomPromptPopup() {
     existingPopup.remove();
   }
 
-  // Create popup container
+  // Create popup container with modern responsive design
   const popup = document.createElement('div');
   popup.id = 'text-enhancer-popup';
-  popup.className = 'text-enhancer-context-popup';
+  popup.className = 'text-enhancer-context-popup modern-popup';
 
-  // Create header
+  // Create header with improved design
   const header = document.createElement('div');
-  header.className = 'text-enhancer-popup-header';
+  header.className = 'text-enhancer-popup-header modern-header';
   
   const titleContainer = document.createElement('div');
+  titleContainer.className = 'title-container';
   
   const title = document.createElement('h2');
   title.id = 'text-enhancer-title';
-  title.textContent = 'Tone Genie (AI-powered text enhancer)';
+  title.textContent = '✨ Text-Enhancer';
   
   const subtitle = document.createElement('p');
   subtitle.id = 'text-enhancer-subtitle';
-  subtitle.textContent = 'Enhance your writing style with AI';
+  subtitle.textContent = 'AI-powered writing enhancement';
   
   titleContainer.appendChild(title);
   titleContainer.appendChild(subtitle);
   
   const closeButton = document.createElement('button');
-  closeButton.className = 'text-enhancer-close-btn';
-  closeButton.innerHTML = '&times;';
-  closeButton.addEventListener('click', () => popup.remove());
+  closeButton.className = 'text-enhancer-close-btn modern-close';
+  closeButton.innerHTML = '×';
+  closeButton.addEventListener('click', () => {
+    popup.style.opacity = '0';
+    popup.style.transform = 'scale(0.95)';
+    setTimeout(() => popup.remove(), 200);
+  });
   
   header.appendChild(titleContainer);
   header.appendChild(closeButton);
@@ -1789,18 +1907,40 @@ function addContextEnhancerStyles() {
       position: fixed;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      width: 380px;
-      max-width: 95vw;
-      background: #232336;
-      color: #f3f4f6;
-      border-radius: 14px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+      transform: translate(-50%, -50%) scale(0.95);
+      width: min(420px, 95vw);
+      max-height: min(85vh, 650px);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
       padding: 0;
-      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       z-index: 2147483647;
+      backdrop-filter: blur(20px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: popupSlideIn 0.3s ease-out forwards;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.15);
       overflow: hidden;
     }
+    
+    @keyframes popupSlideIn {
+      to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .text-enhancer-context-popup {
+        width: 95vw;
+        max-height: 90vh;
+        border-radius: 12px;
+      }
+    }
+    
     .text-enhancer-popup-header {
       background: linear-gradient(135deg, #7c3aed, #a78bfa);
       color: #fff;
@@ -1835,6 +1975,10 @@ function addContextEnhancerStyles() {
     }
     .text-enhancer-section {
       margin-bottom: 18px;
+      display:flex;
+      flex-direction: column;
+       
+
     }
     .text-enhancer-section label {
       color: #d1d5db;
@@ -1843,27 +1987,34 @@ function addContextEnhancerStyles() {
       margin-bottom: 6px;
       display: block;
     }
-    .text-enhancer-textarea {
+    .text-enhancer-input {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #27272a;
-      border-radius: 7px;
-      background: #18181b;
-      color: #f3f4f6;
-      font-size: 15px;
-      margin-top: 4px;
-      margin-bottom: 2px;
+      padding: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
       resize: vertical;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      min-height: 100px;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
     }
-    .text-enhancer-textarea::placeholder {
-      color: #9ca3af;
-      opacity: 0.8;
+    .text-enhancer-input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
     }
-    .text-enhancer-textarea:focus {
+    .text-enhancer-input:focus {
       outline: none;
-      border-color: #a78bfa;
-      box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.18);
+      border-color: rgba(16, 185, 129, 0.6);
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15), 0 8px 25px rgba(0, 0, 0, 0.1);
+      transform: translateY(-1px);
+    }
+    .text-enhancer-input:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.1);
     }
     .text-enhancer-options {
       display: flex;
@@ -1883,37 +2034,68 @@ function addContextEnhancerStyles() {
     }
     .text-enhancer-buttons {
       display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 10px;
+      gap: 12px;
+      margin-top: 24px;
+      flex-wrap: wrap;
     }
     .text-enhancer-button {
-      padding: 8px 18px;
-      border-radius: 7px;
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 24px;
       border: none;
-      background: #a78bfa;
-      color: #18181b;
-      font-size: 15px;
+      border-radius: 10px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
     }
-    .text-enhancer-generate-btn {
-      background: #7c3aed;
-      color: #fff;
+    .text-enhancer-button:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
     }
-    .text-enhancer-generate-btn:hover {
-      background: #a78bfa;
-      color: #18181b;
+    .text-enhancer-button:hover:before {
+      left: 100%;
     }
     .text-enhancer-cancel-btn {
-      background: #232336;
-      color: #c4b5fd;
-      border: 1px solid #7c3aed;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
     .text-enhancer-cancel-btn:hover {
-      background: #18181b;
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    }
+    .text-enhancer-generate-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
       color: #fff;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    .text-enhancer-generate-btn:hover {
+      background: linear-gradient(135deg, #059669, #047857);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+    }
+    .text-enhancer-generate-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    @media (max-width: 480px) {
+      .text-enhancer-buttons {
+        flex-direction: column;
+      }
+      .text-enhancer-button {
+        min-width: unset;
+      }
     }
     @media (max-width: 500px) {
       .text-enhancer-context-popup {
@@ -1958,34 +2140,133 @@ function showReviewPopup() {
 }
 
 
-// function addFloatingButtonStyles() {
-//   const id = 'text-enhancer-floating-styles';
-//   if (document.getElementById(id)) return;
-//   const style = document.createElement('style');
-//   style.id = id;
-//   style.textContent = `
-//     .te-fab{position:absolute; color:#fff;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#542097,#131317,#3C3C6D);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2147483647;box-shadow:0 2px 6px rgba(0,0,0,0.3);}
-//     .te-fab img{width:18px;height:18px;}
-//     .te-menu{position:absolute;min-width:140px;background:#232336;color:#f3f4f6;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.35);padding:6px 0;z-index:2147483647;display:none;font-family:Inter,sans-serif;}
-//     .te-menu.open{display:block;}
-//     .te-menu button{width:100%;background:none;border:none;color:#f3f4f6;text-align:left;padding:8px 12px;font-size:13px;cursor:pointer;transition:background 0.2s;}
-//     .te-menu button:hover{background:#3b3b4d;}
-//   `;
-//   document.head.appendChild(style);
-// }
 
-// --- Floating button / menu implementation ---
-let teFabEl = null; // floating button element
-let teMenuEl = null; // menu element
-let teTargetEl = null; // currently focused editable element
 const originalTextMap = new WeakMap(); // store original text per element for revert
+let teTargetEl = null; // currently focused editable element for inline toolbar
+
+// --- Revert / Regenerate inline toolbar ---
+function getTextFromElement(el) {
+  if (!el) return '';
+  if (el.tagName && (el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'input')) {
+    return el.value || '';
+  }
+  return el.innerText || el.textContent || '';
+}
+
+function renderActionBar(targetEl) {
+  if (!targetEl) return;
+  // Remove existing bar if any
+  removeActionBar();
+  const bar = document.createElement('div');
+  // attach original data onto bar for quick access
+  const origEntry = originalTextMap.get(targetEl);
+  if (origEntry) {
+    bar.dataset.originalText = origEntry.text || '';
+    bar.dataset.originalParams = JSON.stringify(origEntry.params || {});
+  }
+  bar.className = 'te-action-bar';
+  bar.style.cssText = `position:absolute; z-index:99999; background:#232336; color:#f3f4f6; padding:4px 8px; border-radius:6px; display:flex; gap:6px; font-family:Inter, sans-serif; font-size:12px; box-shadow:0 2px 6px rgba(0,0,0,.4);`;
+
+  const btnClose = document.createElement('button');
+  btnClose.textContent = '×';
+  btnClose.style.cssText = 'background:transparent;color:#9ca3af;border:none;font-size:14px;line-height:14px;padding:0 4px;cursor:pointer;';
+
+  const btnRevert = document.createElement('button');
+  btnRevert.textContent = '↩ Revert';
+  btnRevert.style.cssText = 'background:#2d2d40;color:#c4b5fd;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;';
+
+  const btnRegenerate = document.createElement('button');
+  btnRegenerate.textContent = '🔄 Regenerate';
+  btnRegenerate.style.cssText = 'background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;';
+
+  bar.appendChild(btnClose);
+  bar.appendChild(btnRevert);
+  bar.appendChild(btnRegenerate);
+
+  document.body.appendChild(bar);
+  positionBar();
+
+  function positionBar() {
+    const rect = targetEl.getBoundingClientRect();
+    bar.style.top = `${window.scrollY + rect.bottom + 4}px`;
+    bar.style.left = `${window.scrollX + rect.left}px`;
+  }
+
+  window.addEventListener('scroll', positionBar, { passive: true });
+  const observer = new ResizeObserver(positionBar);
+  observer.observe(targetEl);
+
+  function cleanup() {
+    bar.remove();
+    window.removeEventListener('scroll', positionBar);
+    observer.disconnect();
+  }
+
+  btnRevert.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const originalText = bar.dataset.originalText || '';
+    const originalParams = bar.dataset.originalParams ? JSON.parse(bar.dataset.originalParams) : null;
+    console.debug('[TE] Revert click', originalText);
+    
+    // Clean up first to prevent glitches
+    cleanup();
+    
+    // Then revert the text
+    setTimeout(() => {
+      setTextInFocusedElement(targetEl, originalText, originalParams);
+    }, 50);
+  });
+
+  btnRevert.addEventListener('mousedown', e => e.stopPropagation());
+  btnRegenerate.addEventListener('mousedown', e => e.stopPropagation());
+  btnClose.addEventListener('click', () => cleanup());
+
+  btnRegenerate.addEventListener('click', () => {
+    const entryText = bar.dataset.originalText || '';
+    const entryParams = bar.dataset.originalParams ? JSON.parse(bar.dataset.originalParams) : null;
+    btnRegenerate.disabled = true;
+    btnRegenerate.textContent = '…';
+    chrome.runtime.sendMessage({
+      action: entryParams && entryParams.action ? entryParams.action : 'enhance-text-with-gemini',
+      text: entryText,
+      context: entryParams && entryParams.context ? entryParams.context : 'general',
+      customPrompt: entryParams ? entryParams.customPrompt : undefined,
+      tone: entryParams ? entryParams.tone : undefined,
+      includeEmojis: entryParams ? entryParams.includeEmojis : false
+    }, (response) => {
+      btnRegenerate.disabled = false;
+      btnRegenerate.textContent = '🔄 Regenerate';
+      if (response && response.success) {
+        setTextInFocusedElement(targetEl, response.enhancedText);
+      } else {
+        console.error('Regenerate failed', response && response.error);
+      }
+    });
+  });
+
+  // auto cleanup when element loses focus or user types
+  const keyListener = () => cleanup();
+  targetEl.addEventListener('keydown', keyListener, { once: true });
+  // Do NOT auto-cleanup on blur, as clicking buttons steals focus and removes the bar before handler fires
+
+  // expose for other calls
+  window.__teCleanupBar = cleanup;
+}
+
+function removeActionBar() {
+  if (window.__teCleanupBar) {
+    window.__teCleanupBar();
+    window.__teCleanupBar = null;
+  }
+}
 
 // --- Platform-specific editable selectors ---
 // Map of domains to selectors for their main text inputs/editors
 const platformHandlers = {
   // Updated selector: try DM composer textbox specifically, fallback to any contenteditable
   'instagram.com': { selector: 'div[role="textbox"][contenteditable="true"][aria-describedby="Message"], div[role="textbox"][contenteditable="true"][aria-label="Message"], div[role="textbox"][contenteditable="true"][data-testid="DMComposerTextInput"], div[role="textbox"][contenteditable="true"]' },
-  'twitter.com':   { selector: '[data-testid="tweetTextarea_0"], div[contenteditable="true"][role="textbox"]' },
+  'x.com':   { selector: '[data-testid="tweetTextarea_0"], div[contenteditable="true"][role="textbox"]' },
   'web.whatsapp.com': { selector: '[contenteditable="true"][data-tab][data-tab!="1"]' },
   // Generic fallback for all other sites
   '*': { selector: 'textarea, input[type="text"], input[role="textbox"], [contenteditable=""], [contenteditable="true"], div[role="textbox"]' }
@@ -2014,70 +2295,14 @@ function findPlatformEditable(node) {
     if (closest) return closest;
     const anyGeneric = document.querySelector(genericSel);
     if (anyGeneric) return anyGeneric;
-  }
+  } 
   return null;
 }
-
-// function createFab(targetEl){
-//   addFloatingButtonStyles();
-//   // remove existing fab/menu
-//   removeFab();
-//   teTargetEl = targetEl;
-
-//   const rect = targetEl.getBoundingClientRect();
-//   teFabEl = document.createElement('div');
-//   teFabEl.className='te-fab';
-//   teFabEl.style.top = `${rect.top + window.scrollY + 4}px`;
-//   teFabEl.style.left = `${rect.right + window.scrollX - 36}px`;
-
-//   // Use extension icon if available, else plus sign
-//   const img = document.createElement('img');
-//   try{img.src = chrome.runtime.getURL('icons/logo.png');}catch(e){}
-//   if(img.src){teFabEl.appendChild(img);}else{teFabEl.textContent='✎';}
-
-//   // Create menu
-//   teMenuEl = document.createElement('div');
-//   teMenuEl.className='te-menu';
-//   const actions = [
-//     {id:'quick',label:'Quick Enhance',handler:quickEnhanceAction},
-//     {id:'context',label:'Context Enhance',handler:()=>{showContextEnhancerPopup();hideMenu();}},
-//     {id:'prompt',label:'Custom Prompt',handler:()=>{showCustomPromptPopup();hideMenu();}},
-//     {id:'revert',label:'Revert',handler:revertAction}
-//   ];
-//   actions.forEach(a=>{
-//     const btn=document.createElement('button');
-//     btn.textContent=a.label;
-//     btn.onclick=(ev)=>{ev.stopPropagation(); a.handler();};
-//     teMenuEl.appendChild(btn);
-//   });
-//   document.body.appendChild(teFabEl);
-//   document.body.appendChild(teMenuEl);
-
-//   // Position menu below the fab
-//   const menuRect = {top: rect.top + window.scrollY + 40, left: rect.right + window.scrollX - 140};
-//   teMenuEl.style.top = `${menuRect.top}px`;
-//   teMenuEl.style.left = `${menuRect.left}px`;
-
-//   teFabEl.addEventListener('click', (ev)=>{ev.stopPropagation(); toggleMenu();});
-// }
-
-// function toggleMenu(){
-//   if(!teMenuEl) return;
-//   const isOpen = teMenuEl.classList.toggle('open');
-//   // Fallback inline display in case host page CSS interferes
-//   teMenuEl.style.display = isOpen ? 'block' : 'none';
-// }
-// function hideMenu(){ if(teMenuEl){ teMenuEl.classList.remove('open'); teMenuEl.style.display='none'; }}
-// function removeFab(){
-//   if(teFabEl){teFabEl.remove();teFabEl=null;}
-//   if(teMenuEl){teMenuEl.remove();teMenuEl=null;}
-// }
-
 function quickEnhanceAction(){
   if(!teTargetEl)return;
   const txt = getTextFromFocusedElement(teTargetEl) || '';
   originalTextMap.set(teTargetEl, txt);
-  hideMenu();
+
   // ensure target is focused for enhanceText flow
   teTargetEl.focus();
   enhanceText();
@@ -2092,55 +2317,6 @@ function revertAction(){
     showToast('No original text stored','error');
   }
 }
-
-// Handle focus events to show fab
-function handleFocusIn(e){
-  let tgt = e.target;
-  if (!isEditableElement(tgt)) {
-    // Try platform-specific fallback
-    const plat = findPlatformEditable(tgt);
-    if (plat) tgt = plat;
-  }
-  if (isEditableElement(tgt)) {
-    createFab(tgt);
-  } else {
-    removeFab();
-  }
-}
-
-// Some web apps (e.g., WhatsApp Web, Twitter) prevent normal focus events on their
-// rich editors.  As a fallback we also listen for click events and look for the
-// nearest editable ancestor.
-function handleClickEditable(e) {
-  // If a menu or the fab itself was clicked, ignore.
-  if (teFabEl && (teFabEl.contains(e.target) || (teMenuEl && teMenuEl.contains(e.target)))) {
-    return;
-  }
-
-  let candidate = isEditableElement(e.target) ? e.target : findContentEditableAncestor(e.target);
-  if (!candidate) {
-    candidate = findPlatformEditable(e.target);
-  }
-  if (candidate) {
-    createFab(candidate);
-  } else {
-    removeFab();
-  }
-}
-
-// function handleClickOutside(e){
-//   if(teFabEl && !teFabEl.contains(e.target) && teMenuEl && !teMenuEl.contains(e.target)){
-//     hideMenu();
-//   }
-// }
-
-// Floating FAB/menu disabled for now. Re-enable by restoring listeners below.
-// document.addEventListener('focusin', handleFocusIn, true);
-// document.addEventListener('blur', removeFab, true);
-// document.addEventListener('click', handleClickOutside, true);
-// document.addEventListener('click', handleClickEditable, true);
-
-// ------------ END Floating Mini-Popup UI -------------
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -2162,8 +2338,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
  
 
-// Log that the content script has loaded
-//console.log('Text-Enhancer (AI-powered) content script loaded');
+// Mark review as completed if user is on the hosted feedback page
+try{
+  if(location.hostname.includes('tone-genie.vercel.app') && location.pathname.includes('feedback')){
+    chrome.storage&&chrome.storage.local&&chrome.storage.local.set({textEnhancerReviewed:true});
+  }
+}catch(err){/* ignore */}
 
 // Initialize the extension
 (function() {

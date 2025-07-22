@@ -73,7 +73,9 @@
     {
       "resources": [
         "icons/*",
-        "public/icons/*"
+        "public/icons/*",
+        "public/landing.html",
+        "public/landing.css"
       ],
       "matches": ["<all_urls>"]
     }

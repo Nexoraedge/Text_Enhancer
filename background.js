@@ -1,13 +1,16 @@
-import { enhanceTextWithGemini } from './src/utils/geminiApi.js';
+// Text enhancement via backend proxy (no API key needed)
+async function enhanceTextWithProxy(text, options = {}) {
+  const response = await fetch('https://tone-genie.vercel.app/api/enhance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, options })
+  });
+  const data = await response.json();
+  if (data.success) return data.enhancedText;
+  throw new Error(data.error || 'Enhancement failed');
+}
 import { buildEnhancementPrompt, addEmojiPrompt } from './src/utils/prompts.js';
 
-// Background script for Text-Enhancer (AI-powered) extension
-// -----------------------------------------------------------------------------
-// Default prompt used for Quick Enhance (Ctrl+Shift+U)
-const QUICK_ENHANCE_PROMPT =
-  'Improve the grammar, clarity, and flow of the following text. ' +
-  'Preserve the original tone and intent. Do not add or remove ideas, ' +
-  'and keep the response concise and professional. Return only the revised text.';
 
 // Website integration (landing/help, privacy, feedback)
 const LANDING_URL = 'https://tone-genie.vercel.app/';
@@ -133,8 +136,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           prompt = addEmojiPrompt(prompt);
         }
 
-        const enhancedText = await enhanceTextWithGemini(apiKey, message.text, {
-          customPrompt: prompt,
+        const enhancedText = await enhanceTextWithProxy(message.text, {
+          prompt: prompt,
           includeEmojis: false, // already embedded via prompt if requested
           contextType: message.context || 'general',
         });

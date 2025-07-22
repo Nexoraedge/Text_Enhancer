@@ -1,19 +1,19 @@
-"use strict";const f="https://tone-genie.vercel.app/api/enhance",x={temperature:.7};async function w(e,t,n={}){var i,l,p;if(!t)throw new Error("No text provided");const a={text:t,options:{prompt:n.customPrompt,includeEmojis:n.includeEmojis??!1,generationConfig:x,contextType:n.contextType??"general"}};let o=f;try{const{apiBaseUrl:c}=await((p=(l=(i=chrome.storage)==null?void 0:i.local)==null?void 0:l.get)==null?void 0:p.call(l,"apiBaseUrl"))??{};c&&(o=c)}catch{}const r=await fetch(o,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(a)});if(!r.ok){const c=await r.json().catch(()=>({}));throw new Error(c.error||`Backend error ${r.status}`)}const s=await r.json();if(!s.success)throw new Error(s.error||"Enhancement failed");return s.enhancedText.trim()}const y=`You are a professional text editor with a deep understanding of natural language tone and style. Your task is to enhance the following text while preserving the user's original tone and intent.
+"use strict";const m=`You are a skilled text enhancer. Improve the following text while keeping it natural and authentic.
 
-Rules:
-- Correct grammar, spelling, and punctuation mistakes
-- Improve clarity, flow, and sentence structure
-- Match and maintain the original tone (formal, casual, funny, confident, etc.)
-- Do NOT make the tone more professional or rigid unless the original was
-- Keep the text roughly the same length
-- Add appropriate line breaks and emojis
-- Do NOT add or remove ideas
-- Maintain the personal style or quirks if present
-- Return ONLY the enhanced text without explanation
+Guidelines:
+- Fix grammar, spelling, and punctuation
+- Improve clarity and flow
+- Keep the original tone and personality
+- Make it more engaging but not overly dramatic
+- Use emojis sparingly (1-2 max) and only if they fit naturally
+- Avoid excessive hashtags or repetitive phrases
+- Keep the same general length
+- Make it sound human and genuiney
+- Return ONLY the improved text
 
 Text to enhance: "{text}"
 
-Enhanced text:`,d={professional:`Transform the following text into a professional, polished version suitable for business communication.
+Improved text:`,l={professional:`Transform the following text into a professional, polished version suitable for business communication.
 
 Guidelines:
 - Use formal language and proper business etiquette
@@ -90,7 +90,7 @@ Guidelines:
 
 Original text: "{text}"
 
-Empathetic version:`},u={email:`Enhance this text for email communication. Make it clear, professional, and well-structured.
+Empathetic version:`},c={email:`Enhance this text for email communication. Make it clear, professional, and well-structured.
 
 Guidelines:
 - Use proper email etiquette
@@ -134,7 +134,7 @@ Guidelines:
 
 Text: "{text}"
 
-Creative version:`},v={generate_from_context:`Based on the following context, generate appropriate text that fulfills the user's request.
+Creative version:`},h={generate_from_context:`Based on the following context, generate appropriate text that fulfills the user's request.
 
 Context: "{context}"
 Request: "{request}"
@@ -147,7 +147,7 @@ Guidelines:
 - Make it engaging and well-written
 - Keep it appropriate length for the context
 
-Generated text:`},h={instagram:`Rewrite the following text for an Instagram Direct Message so it feels like a natural chat. Provide exactly ONE rewritten version – no bullet points, no numbering, no Markdown formatting.
+Generated text:`},p={instagram:`Rewrite the following text for an Instagram Direct Message so it feels like a natural chat. Provide exactly ONE rewritten version – no bullet points, no numbering, no Markdown formatting.
 
 Guidelines:
 - Use friendly, conversational language
@@ -158,18 +158,19 @@ Guidelines:
 
 Text: "{text}"
 
-Rewritten DM:`,twitter:`Optimize this text for Twitter/X platform. Make it concise, engaging, and thread-worthy.
+Rewritten DM:`,X:`Optimize this text for Twitter/X platform. Make it concise, engaging, and thread-worthy.
 
 Guidelines:
 - Keep it concise and punchy
 - Make it engaging and retweetable
 - Use appropriate tone for Twitter
-- Ensure clarity in limited characters
+- Ensure clarity in limited characters  , must be in X word limit .
 - Make it conversation-worthy
+- No need to use keywords unless mentioned or if nessary use only 1 or 2 trending keywords.
 
 Text: "{text}"
 
-Twitter optimized:`,whatsapp:`Optimize this text for WhatsApp messaging. Make it conversational and natural.
+X optimized:`,whatsapp:`Optimize this text for WhatsApp messaging. Make it conversational and natural.
 
 Guidelines:
 - Use natural, conversational tone
@@ -191,12 +192,12 @@ Guidelines:
 
 Text: "{text}"
 
-LinkedIn optimized:`};function E(e,t){return`${e}
+LinkedIn optimized:`};function g(e,t){return`${e}
 
 Text to enhance: "${t}"
 
-Enhanced text:`}function T(e,t={}){const{customPrompt:n,tone:a,context:o,platform:r,action:s}=t;let i=null;return n&&(i=E(n,e)),!i&&s==="context-enhancer"&&o&&(i=v.generate_from_context.replace("{context}",o).replace("{request}",e).replace("{tone}",a||"natural")),!i&&r&&h[r]&&(i=h[r].replace("{text}",e)),!i&&o&&u[o]&&(i=u[o].replace("{text}",e)),!i&&a&&d[a]&&(i=d[a].replace("{text}",e)),i||(i=y.replace("{text}",e)),`${i}
+Enhanced text:`}function f(e,t={}){const{customPrompt:n,tone:i,context:o,platform:r,action:s}=t;let a=null;return n&&(a=g(n,e)),!a&&s==="context-enhancer"&&o&&(a=h.generate_from_context.replace("{context}",o).replace("{request}",e).replace("{tone}",i||"natural")),!a&&r&&p[r]&&(a=p[r].replace("{text}",e)),!a&&o&&c[o]&&(a=c[o].replace("{text}",e)),!a&&i&&l[i]&&(a=l[i].replace("{text}",e)),a||(a=m.replace("{text}",e)),`${a}
 
-Respond with only the final enhanced text, without explanations.`}function b(e){return`${e}
+Respond with only the final enhanced text, without explanations.`}function x(e){return`${e}
 
-Additional instruction: Add appropriate emojis to enhance the text, but use them sparingly and only where they naturally fit.`}const m="https://tone-genie.vercel.app/",M="https://tone-genie.vercel.app/feedback";chrome.runtime.onInstalled.addListener(e=>{chrome.runtime.setUninstallURL(M,()=>{chrome.runtime.lastError&&console.error("Failed to set uninstall URL:",chrome.runtime.lastError)});try{e.reason==="install"?chrome.tabs.create({url:m}):e.reason==="update"&&chrome.tabs.create({url:`${m}?updated=1`})}catch(t){console.error("Error opening landing page:",t)}});chrome.commands.onCommand.addListener(e=>{const t={"quick-enhance":{action:"enhance-text"},"custom-prompt":{action:"show-custom-prompt"},"context-generator":{action:"show-context-enhancer"},"open-main-popup":{action:"open-main-popup"}};if(t[e]){if(e==="open-main-popup"){chrome.action.openPopup().catch(n=>console.error("Failed to open action popup:",n));return}chrome.tabs.query({active:!0,currentWindow:!0},async n=>{if(n[0])try{await k(n[0].id),chrome.tabs.sendMessage(n[0].id,t[e],a=>{chrome.runtime.lastError&&(console.error("Error sending message:",chrome.runtime.lastError.message),g(n[0].id,t[e]))})}catch(a){console.error(`Error in ${e} command:`,a)}})}else console.warn("Unrecognized keyboard shortcut command:",e)});async function k(e){try{await chrome.tabs.sendMessage(e,{action:"ping"})}catch{await g(e)}}async function g(e,t=null){try{await chrome.scripting.executeScript({target:{tabId:e},files:["content.js"]}),t&&setTimeout(()=>{chrome.tabs.sendMessage(e,t,n=>{chrome.runtime.lastError&&console.error("Error sending message after injection:",chrome.runtime.lastError.message)})},500)}catch(n){console.error("Error injecting content script:",n)}}chrome.runtime.onMessage.addListener((e,t,n)=>{if(e.action==="enhance-text-with-gemini"||e.action==="enhanceTextFromPopup"||e.action==="enhance-text"||e.action==="custom-prompt"||e.action==="context-enhancer")return(async()=>{try{const o={url:t.tab?t.tab.url:"",title:t.tab?t.tab.title:""};let r=T(e.text,{customPrompt:e.customPrompt,tone:e.tone,context:e.context,platform:e.platform,action:e.action});e.includeEmojis&&(r=b(r));const s=await w(void 0,e.text,{customPrompt:r,includeEmojis:!1,contextType:e.context||"general"});n({success:!0,enhancedText:s})}catch(a){console.error("Error enhancing text:",a),n({success:!1,error:a.message})}})(),!0});
+Additional instruction: Add appropriate emojis to enhance the text, but use them sparingly and only where they naturally fit.`}async function y(e,t={}){const i=await(await fetch("https://tone-genie.vercel.app/api/enhance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:e,options:t})})).json();if(i.success)return i.enhancedText;throw new Error(i.error||"Enhancement failed")}const d="https://tone-genie.vercel.app/",w="https://tone-genie.vercel.app/feedback";chrome.runtime.onInstalled.addListener(e=>{chrome.runtime.setUninstallURL(w,()=>{chrome.runtime.lastError&&console.error("Failed to set uninstall URL:",chrome.runtime.lastError)});try{e.reason==="install"?chrome.tabs.create({url:d}):e.reason==="update"&&chrome.tabs.create({url:`${d}?updated=1`})}catch(t){console.error("Error opening landing page:",t)}});chrome.commands.onCommand.addListener(e=>{const t={"quick-enhance":{action:"enhance-text"},"custom-prompt":{action:"show-custom-prompt"},"context-generator":{action:"show-context-enhancer"},"open-main-popup":{action:"open-main-popup"}};if(t[e]){if(e==="open-main-popup"){chrome.action.openPopup().catch(n=>console.error("Failed to open action popup:",n));return}chrome.tabs.query({active:!0,currentWindow:!0},async n=>{if(n[0])try{await v(n[0].id),chrome.tabs.sendMessage(n[0].id,t[e],i=>{chrome.runtime.lastError&&(console.error("Error sending message:",chrome.runtime.lastError.message),u(n[0].id,t[e]))})}catch(i){console.error(`Error in ${e} command:`,i)}})}else console.warn("Unrecognized keyboard shortcut command:",e)});async function v(e){try{await chrome.tabs.sendMessage(e,{action:"ping"})}catch{await u(e)}}async function u(e,t=null){try{await chrome.scripting.executeScript({target:{tabId:e},files:["content.js"]}),t&&setTimeout(()=>{chrome.tabs.sendMessage(e,t,n=>{chrome.runtime.lastError&&console.error("Error sending message after injection:",chrome.runtime.lastError.message)})},500)}catch(n){console.error("Error injecting content script:",n)}}chrome.runtime.onMessage.addListener((e,t,n)=>{if(e.action==="enhance-text-with-gemini"||e.action==="enhanceTextFromPopup"||e.action==="enhance-text"||e.action==="custom-prompt"||e.action==="context-enhancer")return(async()=>{try{const o={url:t.tab?t.tab.url:"",title:t.tab?t.tab.title:""};let r=f(e.text,{customPrompt:e.customPrompt,tone:e.tone,context:e.context,platform:e.platform,action:e.action});e.includeEmojis&&(r=x(r));const s=await y(e.text,{prompt:r,includeEmojis:!1,contextType:e.context||"general"});n({success:!0,enhancedText:s})}catch(i){console.error("Error enhancing text:",i),n({success:!1,error:i.message})}})(),!0});

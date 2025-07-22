@@ -1,22 +1,22 @@
 // Generated prompt utilities for Text-Enhancer
 // --------------------------------------------
 // 1. QUICK ENHANCE PROMPT
-export const QUICK_ENHANCE_PROMPT = `You are a professional text editor with a deep understanding of natural language tone and style. Your task is to enhance the following text while preserving the user's original tone and intent.
+export const QUICK_ENHANCE_PROMPT = `You are a skilled text enhancer. Improve the following text while keeping it natural and authentic.
 
-Rules:
-- Correct grammar, spelling, and punctuation mistakes
-- Improve clarity, flow, and sentence structure
-- Match and maintain the original tone (formal, casual, funny, confident, etc.)
-- Do NOT make the tone more professional or rigid unless the original was
-- Keep the text roughly the same length
-- Add appropriate line breaks and emojis
-- Do NOT add or remove ideas
-- Maintain the personal style or quirks if present
-- Return ONLY the enhanced text without explanation
+Guidelines:
+- Fix grammar, spelling, and punctuation
+- Improve clarity and flow
+- Keep the original tone and personality
+- Make it more engaging but not overly dramatic
+- Use emojis sparingly (1-2 max) and only if they fit naturally
+- Avoid excessive hashtags or repetitive phrases
+- Keep the same general length
+- Make it sound human and genuiney
+- Return ONLY the improved text
 
 Text to enhance: "{text}"
 
-Enhanced text:`;
+Improved text:`;
 
 // 2. TONE-SPECIFIC PROMPTS
 export const TONE_PROMPTS = {
@@ -218,18 +218,19 @@ Guidelines:
 Text: "{text}"
 
 Rewritten DM:`,
-  twitter: `Optimize this text for Twitter/X platform. Make it concise, engaging, and thread-worthy.
+  X: `Optimize this text for Twitter/X platform. Make it concise, engaging, and thread-worthy.
 
 Guidelines:
 - Keep it concise and punchy
 - Make it engaging and retweetable
 - Use appropriate tone for Twitter
-- Ensure clarity in limited characters
+- Ensure clarity in limited characters  , must be in X word limit .
 - Make it conversation-worthy
+- No need to use keywords unless mentioned or if nessary use only 1 or 2 trending keywords.
 
 Text: "{text}"
 
-Twitter optimized:`,
+X optimized:`,
   whatsapp: `Optimize this text for WhatsApp messaging. Make it conversational and natural.
 
 Guidelines:
