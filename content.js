@@ -1,3 +1,9 @@
+if (window.__TEXT_ENHANCER_LOADED__) {
+  console.debug('[TE] content script already loaded');
+  // Prevent duplicate execution
+} else {
+  window.__TEXT_ENHANCER_LOADED__ = true;
+
 // --- Support messages for review popup ---
 const SUPPORT_MESSAGES = [
   "✨ Enjoying ToneGenie? A kind review would mean a lot!",
@@ -2342,3 +2348,4 @@ try{
   }
   // Close the IIFE function wrapper
 })();
+}
