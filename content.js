@@ -193,7 +193,7 @@ function detectContextType(url, pageTitle) {
   const urlLower = url.toLowerCase();
   const titleLower = pageTitle.toLowerCase();
   
-  // Social media context detection
+  // Social media context detection 
   if (
     urlLower.includes('x.com') || 
     urlLower.includes('instagram.com') ||
@@ -483,37 +483,104 @@ function replaceContentEditable(el, newText) {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+function twitterRewrite(el, newText) {
+  if (!el) return false;
+  el.focus();
+  // Clear existing content (Ctrl/⌘+A then Backspace)
+  dispatchKeystroke(el, 'a', 'KeyA', true);
+  dispatchKeystroke(el, 'Backspace', 'Backspace');
+  // Paste the new text via synthetic clipboard event so DraftJS updates its store
+  const dt = new DataTransfer();
+  dt.setData('text/plain', newText);
+  el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+  // Fire React-friendly events to confirm change
+  el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: newText }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+
 function replaceTwitterEditable(el, newText) {
   if (!el) return false;
   try {
+    console.debug('[TE] Twitter replacement starting for:', newText);
     el.focus();
-    // Select all & delete to fully clear DraftJS state
-    const sel = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    document.execCommand('delete');
-
-        // --- Robust insertion via synthetic paste ---
-    const dt = new DataTransfer();
-    dt.setData('text/plain', newText);
-    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
-
-    // DraftJS usually handles the paste and updates its state. Give it a tick.
-    setTimeout(() => {
-      // Ensure value shows (if not already)
-      if (el.innerText.trim() !== newText.trim()) {
-        el.innerText = newText;
-        el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: newText }));
+    
+    // Method 1: Try React's internal value setter first
+    const reactProps = Object.keys(el).find(key => key.startsWith('__reactProps') || key.startsWith('__reactInternalInstance'));
+    if (reactProps && el[reactProps]) {
+      try {
+        const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set ||
+                           Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (valueSetter) {
+          valueSetter.call(el, newText);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          console.debug('[TE] React value setter used');
+          return true;
+        }
+      } catch (reactErr) {
+        console.debug('[TE] React setter failed, trying DOM approach');
       }
-    }, 0);
-
-    // Blur/focus trick to force React commit
+    }
+    
+    // Method 2: Full DOM manipulation with multiple sync attempts
+    // Clear completely
+    el.innerHTML = '';
+    el.textContent = '';
+    el.innerText = '';
+    
+    // Select all and delete (DraftJS state clear)
+    const sel = window.getSelection();
+    sel.selectAllChildren(el);
+    document.execCommand('delete', false, null);
+    
+    // Insert new text via multiple methods
+    const success1 = document.execCommand('insertText', false, newText);
+    if (!success1) {
+      // Fallback: synthetic paste
+      const dt = new DataTransfer();
+      dt.setData('text/plain', newText);
+      el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+    }
+    
+    // Force DOM update
+    el.textContent = newText;
+    el.innerText = newText;
+    
+    // Fire all possible events to sync React/DraftJS
+    const events = [
+      new InputEvent('beforeinput', { inputType: 'insertText', data: newText, bubbles: true }),
+      new InputEvent('input', { inputType: 'insertText', data: newText, bubbles: true }),
+      new Event('change', { bubbles: true }),
+      new Event('blur', { bubbles: true }),
+      new Event('focus', { bubbles: true })
+    ];
+    
+    events.forEach(evt => {
+      try { el.dispatchEvent(evt); } catch (e) { /* ignore */ }
+    });
+    
+    // Multiple focus/blur cycles to force React reconciliation
     el.blur();
-    setTimeout(() => el.focus(), 0);
-
-    console.debug('[TE] Twitter replacement done');
+    setTimeout(() => {
+      el.focus();
+      // Final verification and force-set
+      if (el.innerText !== newText) {
+        el.innerText = newText;
+        el.textContent = newText;
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: newText }));
+      }
+      
+      // Trigger a space and backspace to wake up DraftJS
+      setTimeout(() => {
+        dispatchKeystroke(el, ' ', 'Space');
+        setTimeout(() => {
+          dispatchKeystroke(el, 'Backspace', 'Backspace');
+        }, 10);
+      }, 50);
+    }, 100);
+    
+    console.debug('[TE] Twitter replacement completed');
     return true;
   } catch (err) {
     console.error('[TE] Twitter replacement error', err);
@@ -697,12 +764,11 @@ function setTextInFocusedElement(element, text, params = null) {
         } catch(err){ console.error('Instagram replace failed', err); }
       }
       if (host.endsWith('twitter.com') || host.endsWith('x.com')) {
-        try {
-          const twEditable = (targetEditable && targetEditable.querySelector('[data-testid="tweetTextarea_0"],div[role="textbox"]')) || rootEditable || targetEditable;
-          replaceTwitterEditable(twEditable, text);
+        const box = document.querySelector('div[role="textbox"][contenteditable="true"]');
+        if (twitterRewrite(box || targetEditable, text)) {
           renderActionBar(element);
           return true;
-        } catch(err){ console.error('Twitter replace failed', err);} 
+        }
       }
       // ----- Generic contenteditable replacement (other sites) -----
       if (host.endsWith('instagram.com')) {
