@@ -158,15 +158,14 @@ Guidelines:
 
 Text: "{text}"
 
-Rewritten DM:`,X:`Optimize this text for Twitter/X platform. Make it concise, engaging, and thread-worthy.
+Rewritten DM:`,X:`Optimize this text for Twitter/X platform. Make it concise, engaging.
 
 Guidelines:
 - Keep it concise and punchy
-- Make it engaging and retweetable
-- Use appropriate tone for Twitter
+- Tone must not be changed
 - Ensure clarity in limited characters  , must be in X word limit .
-- Make it conversation-worthy
-- No need to use keywords unless mentioned or if nessary use only 1 or 2 trending keywords.
+- Make it conversation-worthy.
+- No need to use keywords unless earlier mentioned.
 
 Text: "{text}"
 
