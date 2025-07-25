@@ -1,145 +1,14 @@
+import { showToast } from './src/components/Toast.js';
+import incrementUsageCountAndMaybePrompt from './src/fbpopup.js';
+
 if (window.__TEXT_ENHANCER_LOADED__) {
   console.debug('[TE] content script already loaded');
   // Prevent duplicate execution
 } else {
   window.__TEXT_ENHANCER_LOADED__ = true;
 
-// --- Support messages for review popup ---
-const SUPPORT_MESSAGES = [
-  "✨ Enjoying ToneGenie? A kind review would mean a lot!",
-  "☕ Like the tool? Buy me a coffee & keep it alive!",
-  "💬 Helped you today? A small review goes a long way.",
-  "🪄 Magic happened? Show some love with a quick rating!",
-  "💡 This tool runs on creativity (and a little coffee)!",
-  "🫶 Built this for creators — your feedback fuels updates!",
-  "😄 Smiled while using ToneGenie? Say thanks with a review!",
-  "🚀 Help us grow! Drop a review if it helped you fly.",
-  "🔧 One dev. Many cups of coffee. Support keeps me coding!",
-  "❤️ Liked the vibe? A rating helps more than you think.",
-  "🌟 If this saved your time — rate it, fuel the mission!",
-  "📝 Love ToneGenie? Tap a star & tell the world!",
-  "👀 Still here? Might as well drop a 5-star review 😉",
-  "🌈 Spread good vibes — your review keeps this tool free!",
-  "🔥 This took caffeine, passion & late nights. Show support!",
-  "💻 One-man army here. A review = real motivation 🚀",
-  "🎁 Like a free gift? Help me with a tiny shoutout!",
-  "🤖 AI worked hard. Now give it a little applause 💬",
-  "📢 Love tools like this? Your feedback keeps them alive!",
-  "🥰 Reviews aren’t just stars — they keep solo devs going!",
-  "🙌 If this helped you close a deal, boost the project!",
-  "🔁 Using this often? Pay it forward with a kind review.",
-  "🎯 If this hit the right tone — let the world know!",
-  "😌 Made writing easier today? Consider showing some ❤️",
-  "💬 Sharing is caring — leave feedback to help others!",
-  "🌟 Found it useful? A small review = huge impact!",
-  "🧠 Good AI deserves good vibes. Drop a rating!",
-  "🍀 Feeling lucky this worked? Pay it back with stars!",
-  "🎉 This is free, but your review is priceless!",
-  "👋 Before you go, your 5-star review = fuel for updates!"
-];
-
-function addReviewStyles() {
-  const styleId = 'text-enhancer-review-styles';
-  if (document.getElementById(styleId)) return;
-  const style = document.createElement('style');
-  style.id = styleId;
-  style.textContent = `
-    .text-enhancer-review-popup {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 320px;
-      max-width: 95vw;
-      background: #232336;
-      color: #f3f4f6;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-      padding: 20px;
-      z-index: 100000;
-      font-family: 'Inter', sans-serif;
-    }
-    .text-enhancer-review-popup h3 {
-      margin-top: 0;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
-    .text-enhancer-stars {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-    .text-enhancer-star-btn {
-      background: transparent;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: #6b7280;
-      transition: color 0.2s;
-    }
-    .text-enhancer-star-btn.active,
-    .text-enhancer-star-btn:hover {
-      color: #facc15;
-    }
-    .text-enhancer-review-popup textarea {
-      width: 100%;
-      min-height: 60px;
-      resize: vertical;
-      border-radius: 8px;
-      padding: 8px 10px;
-      background: #1c1c24;
-      color: #f3f4f6;
-      border: 1px solid #3f3f46;
-      font-size: 13px;
-      margin-bottom: 12px;
-    }
-    .text-enhancer-review-popup .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-    .text-enhancer-review-popup button {
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 13px;
-      cursor: pointer;
-      border: none;
-      transition: background 0.2s;
-    }
-    .text-enhancer-submit-btn { background:#7c3aed; color:#fff; }
-    .text-enhancer-submit-btn:hover { background:#a78bfa; color:#18181b; }
-    .text-enhancer-later-btn { background:#2d2d40; color:#c4b5fd; }
-    .text-enhancer-later-btn:hover { background:#18181b; color:#fff; }
-    @media(max-width:500px){
-      .text-enhancer-review-popup{right:10px;left:10px;bottom:10px;width:auto;}
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-function incrementUsageCountAndMaybePrompt() {
-  chrome.storage.local.get(
-    ['textEnhancerUsage', 'textEnhancerReviewed', 'textEnhancerUser'],
-    (res) => {
-      let useCount = res.textEnhancerUsage || 0;
-      const reviewed = res.textEnhancerReviewed;
-      const user = res.textEnhancerUser;
 
 
-      useCount += 1;
-
-   
-
-      // Persist counters
-      chrome.storage.local.set({ textEnhancerUsage: useCount });
-
-      // feedback popup logic – every 4 uses after first use
-      if (!reviewed && useCount > 0 && (useCount % 4 === 0)) {
-        showReviewPopup();
-      }
-    }
-  );
-}
 
 let focusedElement = null; // Will always be assigned safely before use
 
@@ -274,56 +143,26 @@ function detectContextType(url, pageTitle) {
 }
 
 // Function to show a toast notification
-function showToast(message, type = 'info') {
-  // Create toast container if it doesn't exist
-  let toastContainer = document.getElementById('gemini-enhancer-toast-container');
-  if (!toastContainer) {
-    toastContainer = document.createElement('div');
-    toastContainer.id = 'gemini-enhancer-toast-container';
-    toastContainer.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 10000;
-    `;
-    document.body.appendChild(toastContainer);
-  }
 
-  // Create toast element
-  const toast = document.createElement('div');
-  toast.style.cssText = `
-    background-color: ${type === 'error' ? '#f44336' : '#1a73e8'};
-    color: white;
-    padding: 12px 16px;
-    border-radius: 4px;
-    margin-top: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    max-width: 300px;
-    opacity: 0;
-    transition: opacity 0.3s;
-  `;
-  toast.textContent = message;
-  toastContainer.appendChild(toast);
-
-  // Fade in
-  setTimeout(() => {
-    toast.style.opacity = '1';
-  }, 10);
-
-  // Remove after 3 seconds
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => {
-      toastContainer.removeChild(toast);
-    }, 300);
-  }, 3000);
-}
 
 // Function to get the currently focused element
 function getFocusedElement() {
-  return document.activeElement;
+  // Use document.activeElement but ignore body/document when nothing is really focused
+  const el = document.activeElement;
+  return el && el !== document.body ? el : null;
+}
+
+// Helper: get text from the given element or the currently focused element.
+// Accepts an optional element argument for callers that already have a reference.
+// Falls back gracefully if the element is not editable.
+function getTextFromFocusedElement(targetEl = null) {
+  const el = targetEl || getFocusedElement();
+  if (!el) return '';
+  // Reuse generic element getter if available for consistency
+  if (typeof getTextFromElement === 'function') {
+    return getTextFromElement(el);
+  }
+  return el.value || el.innerText || el.textContent || '';
 }
 
 // Function to check if element is editable
@@ -344,12 +183,17 @@ function isEditableElement(element) {
   return isNativeInput || isTextArea || isContentEditable;
 }
 
+
+
+
+
 // Bundle helper functions for easier consumption elsewhere
 const EditableHelper = {
   isEditableElement,
   findContentEditableAncestor,
   findPlatformEditable,
   getPlaceholderFromElement,
+  getTextFromFocusedElement,
   getFocusedElement,
   getTextFromElement: getTextFromFocusedElement, // alias for clarity
   setTextInElement: setTextInFocusedElement
@@ -396,63 +240,7 @@ function getPlaceholderFromElement(el) {
 
 
 // Function to get the text from the currently focused element
-function getTextFromFocusedElement(element = null) {
-  // Use provided element or fall back to document.activeElement
-  const activeElement = element || document.activeElement;
-  
-  // Check if the active element is an input or textarea
-  if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable)) {
-    // Store the element for later reference
-    focusedElement = activeElement;
-    
-    // Get text based on element type
-    if (activeElement.isContentEditable) {
-      const txt = activeElement.innerText || '';
-      return txt.trim() !== '' ? txt : getPlaceholderFromElement(activeElement);
-    } else {
-      // Get the actual text content from the input or textarea
-      const txt = activeElement.value || '';
-      return txt.trim() !== '' ? txt : getPlaceholderFromElement(activeElement);
-    }
-  }
-  
-  // If no active element, try to find any editable element with text
-  const editableElements = document.querySelectorAll('input[type="text"], input[type="search"], textarea, [contenteditable="true"]');
-  
-  for (const element of editableElements) {
-    // Skip hidden elements
-    if (element.offsetParent === null) continue;
-    
-    // Skip elements with very small dimensions (likely not visible)
-    if (element.offsetWidth < 20 || element.offsetHeight < 20) continue;
-    
-    // Get the text from the element
-    let text = '';
-    if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
-      text = (element.innerText && element.innerText.trim() !== '') ? element.innerText : getPlaceholderFromElement(element);
-    } else {
-      text = (element.value && element.value.trim() !== '') ? element.value : getPlaceholderFromElement(element);
-    }
-    
-    // If we found an element with text, use it
-    if (text.trim() !== '') {
-      focusedElement = element;
-      return text;
-    }
-  }
-  
-  // If we still haven't found anything, look for any visible input
-  if (editableElements.length > 0) {
-    for (const element of editableElements) {
-      if (element.offsetParent !== null && element.offsetWidth > 50 && element.offsetHeight > 20) {
-        focusedElement = element;
-        return element.value || element.innerText || '';
-      }
-    }
-  }
-  
-  return null;
-}
+
 
 // Helper: simulate keystroke events (keydown/keyup)
 function dispatchKeystroke(el, key, code, ctrlKey = false) {
@@ -813,83 +601,85 @@ function copyToClipboard(text, showNotification = true) {
 
 // Function to enhance text
 async function enhanceText() {
-  // Always use the global focusedElement
-  focusedElement = getFocusedElement();
-  let text;
-  
-  // If no element is focused, look for search inputs, prompt areas, etc.
-  if (!isEditableElement(focusedElement)) {
-    // Look for search inputs, prompt areas, etc.
-    const searchInputs = document.querySelectorAll('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"], textarea[placeholder*="prompt"], textarea[placeholder*="Prompt"]');
-    if (searchInputs.length > 0) {
-      focusedElement = searchInputs[0];
-    } else {
-      focusedElement = null;
-      showToast('No input field found. Enhanced text will be copied to clipboard.', 'info');
-    }
-  }
-  
-  // Get text from the element
-  if (isEditableElement(focusedElement)) {
-    text = getTextFromFocusedElement(focusedElement);
-    if (!text || text.trim() === '') {
-      const ph = getPlaceholderFromElement(focusedElement);
-        if (ph.trim() !== '') {
-        text = ph;
-        showToast('Using placeholder text: "' + text.substring(0, 20) + (text.length > 20 ? '...' : '') + '"');
+  const { isEditableElement, getTextFromFocusedElement, getPlaceholderFromElement, getFocusedElement } = EditableHelper;
+  // Determine the element currently focused when the user triggers enhancement
+  let focusedElement = getFocusedElement();
+    // Always use the global focusedElement
+    let text;
+    
+    // If no element is focused, look for search inputs, prompt areas, etc.
+    if (!isEditableElement(focusedElement)) {
+      // Look for search inputs, prompt areas, etc.
+      const searchInputs = document.querySelectorAll('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"], textarea[placeholder*="prompt"], textarea[placeholder*="Prompt"]');
+      if (searchInputs.length > 0) {
+        focusedElement = searchInputs[0];
       } else {
-        showToast('No text to enhance', 'error');
-        return;
+        focusedElement = null;
+        showToast('No input field found. Enhanced text will be copied to clipboard.', 'info');
       }
     }
-  } else {
-    showToast('No text found to enhance', 'error');
-    return;
-  }
-  
-  showToast('Enhancing text with AI...');
-  
-  // Detect context based on the current page
-  const url = window.location.href;
-  const pageTitle = document.title;
-  const contextType = detectContextType(url, pageTitle);
-  
-  // Send message to background script to enhance text
-  chrome.runtime.sendMessage(
-    {
-      action: 'enhance-text-with-gemini',
-      text,
-      context: contextType
-    },
-    (response) => {
-      if (response && response.success) {
-        // Try to replace text in the element
-        if (isEditableElement(focusedElement)) {
-          const success = setTextInFocusedElement(focusedElement, response.enhancedText);
-          
-          if (success) {
-            showToast('Text enhanced and filled in!', 'success');
-            // Also copy to clipboard as a backup
-            copyToClipboard(response.enhancedText, false);
+    
+    // Get text from the element
+    if (isEditableElement(focusedElement)) {
+      text = getTextFromFocusedElement(focusedElement);
+      if (!text || text.trim() === '') {
+        const ph = getPlaceholderFromElement(focusedElement);
+          if (ph.trim() !== '') {
+          text = ph;
+          showToast('Using placeholder text: "' + text.substring(0, 20) + (text.length > 20 ? '...' : '') + '"');
+        } else {
+          showToast('No text to enhance', 'error');
+          return;
+        }
+      }
+    } else {
+      showToast('No text found to enhance', 'error');
+      return;
+    }
+    
+    showToast('Enhancing text with AI...');
+    
+    // Detect context based on the current page
+    const url = window.location.href;
+    const pageTitle = document.title;
+    const contextType = detectContextType(url, pageTitle);
+    
+    // Send message to background script to enhance text
+    chrome.runtime.sendMessage(
+      {
+        action: 'enhance-text-with-gemini',
+        text,
+        context: contextType
+      },
+      (response) => {
+        if (response && response.success) {
+          // Try to replace text in the element
+          if (isEditableElement(focusedElement)) {
+            const success = setTextInFocusedElement(focusedElement, response.enhancedText);
+            
+            if (success) {
+              showToast('Text enhanced and filled in!', 'success');
+              // Also copy to clipboard as a backup
+              copyToClipboard(response.enhancedText, false);
+            } else {
+              // If filling fails, copy to clipboard as fallback
+              copyToClipboard(response.enhancedText, true);
+            }
           } else {
-            // If filling fails, copy to clipboard as fallback
+            // No editable element, just copy to clipboard
             copyToClipboard(response.enhancedText, true);
           }
         } else {
-          // No editable element, just copy to clipboard
-          copyToClipboard(response.enhancedText, true);
+          showToast(
+            response && response.error 
+              ? `Error: ${response.error}` 
+              : 'Failed to enhance text',
+            'error'
+          );
         }
-      } else {
-        showToast(
-          response && response.error 
-            ? `Error: ${response.error}` 
-            : 'Failed to enhance text',
-          'error'
-        );
       }
-    }
-  );
-}
+    );
+  }
 
 // Add CSS styles to the document
 function addCustomStyles() {
@@ -2161,36 +1951,7 @@ function addContextEnhancerStyles() {
 }
 
 
-function showReviewPopup() {
-  if (document.querySelector('.text-enhancer-feedback-popup')) return;
-  const popup = document.createElement('div');
-  popup.className = 'text-enhancer-feedback-popup';
-  popup.style.cssText = `position:fixed;bottom:24px;right:24px;width:320px;max-width:95vw;background:#232336;color:#f3f4f6;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.4);padding:18px;z-index:100000;font-family:Inter, sans-serif;`;
 
-  const msg = document.createElement('p');
-  msg.textContent = SUPPORT_MESSAGES[Math.floor(Math.random()*SUPPORT_MESSAGES.length)];
-  msg.style.margin='0 0 12px 0';
-  popup.appendChild(msg);
-
-  const btn = document.createElement('button');
-  btn.textContent = 'Leave feedback';
-  btn.style.cssText = 'display:block;width:100%;padding:10px 12px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-weight:600;cursor:pointer;';
-  btn.onclick = () => {
-    // open feedback page
-    window.open('https://tone-genie.vercel.app/feedback', '_blank');
-    chrome.storage.local.set({ textEnhancerReviewed: true });
-    popup.remove();
-  };
-
-  const later = document.createElement('button');
-  later.textContent = 'Later';
-  later.style.cssText='display:block;width:100%;padding:10px 12px;border:none;border-radius:8px;background:#2d2d40;color:#c4b5fd;font-weight:600;cursor:pointer;margin-top:8px;';
-  later.onclick = () => popup.remove();
-  popup.appendChild(btn);
-  popup.appendChild(later);
-
-  document.body.appendChild(popup);
-}
 
 
 
@@ -2392,11 +2153,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  
 
 // Mark review as completed if user is on the hosted feedback page
-try{
-  if(location.hostname.includes('tone-genie.vercel.app') && location.pathname.includes('feedback')){
-    chrome.storage&&chrome.storage.local&&chrome.storage.local.set({textEnhancerReviewed:true});
-  }
-}catch(err){/* ignore */}
 
 // Initialize the extension
 (function() {

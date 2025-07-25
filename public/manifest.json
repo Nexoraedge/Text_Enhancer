@@ -16,6 +16,12 @@
       "128": "icons/icon128.png"
     }
   },
+  "host_permissions": [
+    "https://*.firebaseapp.com/*",
+    "https://*.googleapis.com/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
