@@ -2328,6 +2328,7 @@ function revertAction(){
               } else {
                 showToast(res.error || 'Enhancement failed', 'error', 3000);
               }
+              if(currentEl && typeof currentEl.focus==='function'){ currentEl.focus(); }
               removeQA();
             });
           });
