@@ -6,6 +6,12 @@ if (window.__TEXT_ENHANCER_LOADED__) {
   // Prevent duplicate execution
 } else {
   window.__TEXT_ENHANCER_LOADED__ = true;
+  // Ensure global safeSend exists before modules reference it
+  if(!window.safeSend){
+    window.safeSend = (message, callback)=>{
+      try{ chrome.runtime.sendMessage(message, callback);}catch(e){ console.warn('safeSend placeholder error', e); }
+    };
+  }
 
 
 
@@ -200,7 +206,17 @@ const EditableHelper = {
 };
 
 // Expose globally (useful for debugging in DevTools)
-window.TextEnhancerEditable = EditableHelper;
+// patch setTextInElement to add toast & revert bar
+const A = EditableHelper;
+const originalSetter = A.setTextInElement;
+A.setTextInElement = function(el, text, params) {
+  const orig = A.getTextFromElement(el);
+  const ok = originalSetter ? originalSetter(el, text, params) : false;
+  showToast('Inserted ✅', 'info', 2000);
+  createRevertBar(el, orig);
+  return ok;
+};
+window.TextEnhancerEditable = A;
 
 // Helper: find the closest element with contenteditable="true"
 function findContentEditableAncestor(el) {
@@ -2008,7 +2024,12 @@ function renderActionBar(targetEl) {
 
   window.addEventListener('scroll', positionBar, { passive: true });
   const observer = new ResizeObserver(positionBar);
-  observer.observe(targetEl);
+  observer.observe(document.body,{childList:true});
+  // --- Dragging ---
+  let dragOffsetX=0, dragOffsetY=0, dragging=false;
+  bar.addEventListener('mousedown',e=>{dragging=true; dragOffsetX=e.clientX-parseInt(bar.style.left); dragOffsetY=e.clientY-parseInt(bar.style.top); e.preventDefault();});
+  document.addEventListener('mousemove',e=>{if(!dragging) return; bar.style.left=`${e.clientX-dragOffsetX}px`; bar.style.top=`${e.clientY-dragOffsetY}px`;});
+  document.addEventListener('mouseup',()=>{dragging=false;});
 
   function cleanup() {
     bar.remove();
@@ -2132,6 +2153,236 @@ function revertAction(){
   }
 }
 
+// -------------------- QUICK-ACTION FLOATING BUTTON --------------------
+// Injected when an editable element gains focus. Provides UI for users who
+// don’t want to remember shortcuts.
+(function initQuickActions(){
+  let qaButton = null; // floating pencil button
+  let qaMenu   = null; // options container
+  let currentEl = null; // currently-focused editable
+
+  function injectStyles(){
+    if (document.getElementById('te-quick-style')) return;
+    const s = document.createElement('style');
+    s.id = 'te-quick-style';
+    s.textContent = `
+      .te-qa-btn{position:absolute;width:22px;height:22px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .15s ease;z-index:99999;}
+      .te-qa-btn:hover{transform:scale(1.1);}    
+      .te-qa-menu{position:absolute;display:flex;flex-direction:column;gap:4px;background:#232336;color:#fff;padding:6px 8px;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.4);font-family:Inter,sans-serif;font-size:12px;z-index:99999;}
+      .te-qa-menu button{all:unset;cursor:pointer;padding:4px 6px;border-radius:4px;transition:background .1s;}
+      .te-qa-menu button:hover{background:#2d2d40;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  function removeQA(){
+    qaButton?.remove();
+    qaMenu?.remove();
+    qaButton = qaMenu = currentEl = null;
+    document.removeEventListener('scroll', reposition, true);
+  }
+
+  function reposition(){
+    if(!qaButton || !currentEl) return;
+    const r = currentEl.getBoundingClientRect();
+    qaButton.style.top  = `${window.scrollY + r.top - 26}px`;
+    qaButton.style.left = `${window.scrollX + r.right - 10}px`;
+    if(qaMenu){
+      qaMenu.style.top  = `${parseFloat(qaButton.style.top)+24}px`;
+      qaMenu.style.left = qaButton.style.left;
+    }
+  }
+
+  function showMenu(){
+    if(qaMenu){ qaMenu.remove(); qaMenu=null; return; }
+    qaMenu = document.createElement('div');
+    qaMenu.className = 'te-qa-menu';
+    const actions=[
+      {label:'Quick Enhance', key:'quick'},
+      {label:'Custom Prompt', key:'custom'},
+      {label:'Context Generator', key:'context'},
+    ];
+    // helper to insert enhanced text
+    let lastOriginalText='';
+    function showRevertBar(enhancedText){
+      if(document.querySelector('.te-revert-bar')) return;
+      const bar=document.createElement('div');
+      bar.className='te-revert-bar';
+      bar.style=`position:absolute;z-index:2147483647;background:linear-gradient(135deg,#4c4b8e,#6d57a5);color:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.2);padding:6px 10px;font-size:12px;font-family:sans-serif;display:flex;gap:8px;align-items:center;cursor:move;user-select:none;`;
+      const undoBtn=document.createElement('button');undoBtn.textContent='Undo';
+      const regenBtn=document.createElement('button');regenBtn.textContent='Regenerate';
+      const closeBtn=document.createElement('span');closeBtn.textContent='✕';closeBtn.style.cursor='pointer';closeBtn.style='color:#fff; font-weight:bold;'
+      [undoBtn,regenBtn].forEach(b=>{b.style='padding:2px 6px;font-size:12px;'});
+      bar.appendChild(undoBtn);bar.appendChild(regenBtn);bar.appendChild(closeBtn);
+      document.body.appendChild(bar);
+      function place(){
+        const rect=currentEl.getBoundingClientRect();
+        document.body.appendChild(bar); // ensure offsetHeight known
+        const belowTop = window.scrollY + rect.bottom + 6;
+        const aboveTop = window.scrollY + rect.top - bar.offsetHeight - 6;
+        const topPos = aboveTop > 0 ? aboveTop : belowTop;
+        bar.style.top = `${topPos}px`;
+        bar.style.left = `${window.scrollX + rect.left}px`;
+      }
+      place();
+      undoBtn.onclick=()=>{insertEnhanced(lastOriginalText); bar.remove();};
+      regenBtn.onclick=()=>{showToast('Regenerating...','info',0); safeSend({action:'enhance-text', text:lastOriginalText},res=>{if(res&&res.success){insertEnhanced(res.enhancedText);showToast('Inserted ✅','info',2000);}else{showToast(res.error||'Enhancement failed','error',3000);} });};
+      closeBtn.onclick=()=>bar.remove();
+      // --- Dragging ---
+      let dragOffsetX=0, dragOffsetY=0, dragging=false;
+      bar.addEventListener('mousedown',e=>{dragging=true; dragOffsetX=e.clientX-parseInt(bar.style.left); dragOffsetY=e.clientY-parseInt(bar.style.top); e.preventDefault();});
+      document.addEventListener('mousemove',e=>{if(!dragging) return; bar.style.left=`${e.clientX-dragOffsetX}px`; bar.style.top=`${e.clientY-dragOffsetY}px`;});
+      document.addEventListener('mouseup',()=>{dragging=false;});
+    }
+
+    function insertEnhanced(text){
+      if(!currentEl) return;
+      lastOriginalText = getTextFromFocusedElement(currentEl);
+      if(window.EditableHelper && typeof EditableHelper.replaceText==='function'){
+        try{ EditableHelper.replaceText(currentEl, text); }catch(e){}
+      }else if(currentEl.value!==undefined){ currentEl.value = text; }
+      else { currentEl.innerText = text; }
+      ['input','change'].forEach(evt=>{ currentEl.dispatchEvent(new Event(evt,{bubbles:true})); });
+      // success feedback
+      showToast('Enhanced ☑️','info',2000);
+      createRevertBar(currentEl, lastOriginalText);
+    }
+
+    actions.forEach(({label,key})=>{
+      const b=document.createElement('button');
+      b.textContent=label;
+      b.addEventListener('click',()=>{
+        if(key==='quick'){
+          const text = getTextFromFocusedElement(currentEl);
+          showToast('Enhancing...','info',0);
+          safeSend({action:'enhance-text', text}, (response) => {
+            if(response && response.success){ insertEnhanced(response.enhancedText); showToast('Enhanced ☑️','info',2000); }
+            else { showToast(response.error||'Enhancement failed','error',3000); }
+            removeQA();
+          });
+          currentEl.focus();
+        } else if(key==='custom'){
+          // replace button set with inline textarea for custom prompt
+          qaMenu.innerHTML = '';
+          const container = document.createElement('div');
+          container.style.background = '#232336';
+          container.style.color = '#fff';
+          container.style.padding = '8px';
+          container.style.borderRadius = '8px';
+          container.style.display = 'flex';
+          container.style.flexDirection = 'column';
+          container.style.gap = '6px';
+
+          const textarea = document.createElement('textarea');
+          textarea.rows = 3;
+          textarea.placeholder = "Describe how you'd like it enhanced...";
+          textarea.className = 'text-enhancer-textarea';
+          textarea.style.width = '220px';
+          textarea.style.fontSize = '12px';
+          textarea.style.background = '#1c1c2b';
+          textarea.style.color = '#fff';
+          textarea.style.border = '1px solid #444';
+          textarea.style.borderRadius = '4px';
+          textarea.style.padding = '4px 6px';
+
+          const enhanceBtn = document.createElement('button');
+          enhanceBtn.style.padding = '4px 8px';
+          enhanceBtn.style.fontSize = '12px';
+          enhanceBtn.style.display = 'flex';
+          enhanceBtn.style.alignItems = 'center';
+          enhanceBtn.style.gap = '4px';
+          enhanceBtn.style.background = '#4c4b8e';
+          enhanceBtn.style.color = '#fff';
+          enhanceBtn.style.border = 'none';
+          enhanceBtn.style.borderRadius = '4px';
+          const img = document.createElement('img');
+          img.alt = 'Enhance';
+          img.style.width = '14px';
+          img.style.height = '14px';
+          img.style.objectFit = 'contain';
+          img.src = chrome.runtime.getURL('logo.png');
+          img.onerror = () => {
+            img.onerror = null;
+            img.src = chrome.runtime.getURL('Pen.png');
+            img.onerror = () => {
+              enhanceBtn.textContent = 'Enhance';
+            };
+          };
+          enhanceBtn.appendChild(img);
+
+          // If image fails so quickly that onerror triggers before append, ensure fallback handled
+          if (!img.complete) {
+            img.onload = () => {};
+          }
+
+          // click handler
+          enhanceBtn.addEventListener('click', () => {
+            const prompt = textarea.value.trim();
+            if (!prompt) return;
+            const text = getTextFromFocusedElement(currentEl);
+            showToast('Enhancing...', 'info', 0);
+            safeSend({ action: 'custom-prompt', customPrompt: prompt, text }, (res) => {
+              if (res && res.success) {
+                insertEnhanced(res.enhancedText);
+                showToast('Inserted ✅', 'info', 2000);
+              } else {
+                showToast(res.error || 'Enhancement failed', 'error', 3000);
+              }
+              removeQA();
+            });
+          });
+
+          // enter key to trigger
+          textarea.addEventListener('keydown', (ev)=>{
+            if(ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); enhanceBtn.click(); }
+          });
+
+          container.appendChild(textarea);
+          container.appendChild(enhanceBtn);
+          qaMenu.appendChild(container);
+          textarea.focus();
+        } else if(key==='context'){
+          const text = getTextFromFocusedElement(currentEl);
+          chrome.runtime.sendMessage({action:'context-enhancer', text});
+          removeQA();
+        }
+      });
+      qaMenu.appendChild(b);
+    });
+    document.body.appendChild(qaMenu);
+    reposition();
+  }
+
+  function createButton(target){
+    removeQA();
+    currentEl = target;
+    injectStyles();
+    qaButton = document.createElement('div');
+    qaButton.className = 'te-qa-btn';
+    qaButton.style='padding:2px;';
+    qaButton.textContent = '✏'  ; // insert the image Pen from public folder // pencil icon, light-weight; swapable later
+    qaButton.addEventListener('click', showMenu);
+    document.body.appendChild(qaButton);
+    reposition();
+    // cleanup on scroll; focus change handled globally via focusin
+    document.addEventListener('scroll', reposition, true);
+  }
+
+  document.addEventListener('focusin', (e)=>{
+    const el = e.target;
+    // Ignore focus changes within QA UI itself
+    if (el.closest('.te-qa-btn') || el.closest('.te-qa-menu')) return;
+
+    if (EditableHelper.isEditableElement(el)) {
+      createButton(el);
+    } else {
+      removeQA();
+    }
+  });
+})();
+
+// -------------------- END QUICK-ACTION --------------------
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'enhance-text') {
@@ -2155,7 +2406,82 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Mark review as completed if user is on the hosted feedback page
 
 // Initialize the extension
-(function() {
+(function(){
+  // ------------ TOAST UTILS ------------
+  let activeToast=null;
+  // global safeSend with up to 3 retries when extension context is invalidated
+  function safeSend(message, callback, attempt=1){
+    try{
+      chrome.runtime.sendMessage(message,(res)=>{
+        if(chrome.runtime.lastError && attempt<3 && /context invalidated/i.test(chrome.runtime.lastError.message)){
+          console.warn('[TE] context invalidated – retry', attempt);
+          return setTimeout(()=>safeSend(message, callback, attempt+1), 250*attempt);
+        }
+        callback && callback(res);
+      });
+    }catch(err){
+      if(attempt<3){
+        console.warn('[TE] sendMessage threw – retry', attempt);
+        return setTimeout(()=>safeSend(message, callback, attempt+1), 250*attempt);
+      }
+      console.error(err);
+    }
+  }
+  window.safeSend = safeSend;
+
+  // ------------ GLOBAL REVERT BAR ------------
+  function createRevertBar(targetEl, originalText){
+    if(!targetEl || document.querySelector('.te-revert-bar')) return;
+    const bar=document.createElement('div');
+    bar.className='te-revert-bar';
+    bar.style=`position:absolute;z-index:2147483647;background:linear-gradient(135deg,#4c4b8e,#6d57a5);color:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.2);padding:6px 10px;font-size:12px;font-family:sans-serif;display:flex;gap:8px;align-items:center;cursor:move;user-select:none;`;
+    const undoBtn=document.createElement('button');undoBtn.textContent='Undo';
+    const regenBtn=document.createElement('button');regenBtn.textContent='Regenerate';
+    const closeBtn=document.createElement('span');closeBtn.textContent='✕';closeBtn.style.cursor='pointer';closeBtn.style='color:#fff;font-weight:bold;'
+    ;[undoBtn,regenBtn].forEach(b=>b.style='padding:2px 6px;font-size:12px;');
+    bar.appendChild(undoBtn);bar.appendChild(regenBtn);bar.appendChild(closeBtn);
+    document.body.appendChild(bar);
+    function place(){
+      const rect=targetEl.getBoundingClientRect();
+      const below=window.scrollY+rect.bottom+6;
+      const above=window.scrollY+rect.top-bar.offsetHeight-6;
+      bar.style.top=`${above>0?above:below}px`;
+      bar.style.left=`${window.scrollX+rect.left}px`;
+    }
+    place();
+    // drag
+    let offX=0,offY=0,drag=false;
+    bar.addEventListener('mousedown',e=>{drag=true;offX=e.clientX-parseInt(bar.style.left);offY=e.clientY-parseInt(bar.style.top);e.preventDefault();});
+    document.addEventListener('mousemove',e=>{if(drag){bar.style.left=`${e.clientX-offX}px`;bar.style.top=`${e.clientY-offY}px`;}});
+    document.addEventListener('mouseup',()=>drag=false);
+    // actions
+    undoBtn.onclick=()=>{if(window.EditableHelper&&EditableHelper.replaceText){try{EditableHelper.replaceText(targetEl,originalText);}catch{targetEl.value!==undefined?targetEl.value=originalText:targetEl.innerText=originalText;} ['input','change'].forEach(evt=>targetEl.dispatchEvent(new Event(evt,{bubbles:true}))); bar.remove();};
+    regenBtn.onclick=()=>{showToast('Regenerating...','info',0); safeSend({action:'enhance-text', text:originalText},res=>{if(res&&res.success){ if(window.EditableHelper&&EditableHelper.replaceText){try{EditableHelper.replaceText(targetEl,res.enhancedText);}catch{targetEl.value!==undefined?targetEl.value=res.enhancedText:targetEl.innerText=res.enhancedText;} ['input','change'].forEach(evt=>targetEl.dispatchEvent(new Event(evt,{bubbles:true})) ); showToast('Inserted ✅','info',2000); place(); } } else { showToast(res.error||'Enhancement failed','error',3000);} });};
+    closeBtn.onclick=()=>bar.remove();
+  }
+  window.TextEnhancerUI = { createRevertBar };
+
+  function showToast(msg, type='info', duration=3000){
+    if(activeToast){activeToast.remove();activeToast=null;}
+    const div=document.createElement('div');
+    div.textContent=msg;
+    div.className='te-toast';
+    div.style=`position:fixed;bottom:24px;right:24px;z-index:2147483647;padding:8px 12px;border-radius:4px;font-size:13px;color:#fff;background:${type==='error'?'#d9534f':'#333'};box-shadow:0 2px 6px rgba(0,0,0,.3);opacity:0;transition:opacity .2s`; 
+    document.body.appendChild(div);
+    requestAnimationFrame(()=>{div.style.opacity='1';});
+    activeToast=div;
+    if(duration>0){ setTimeout(()=>{div.style.opacity='0';setTimeout(()=>div.remove(),200);activeToast=null;}, duration); }
+  }
+
+  // Helper to safely retrieve text from editable element
+  function getTextFromFocusedElement(el){
+    if(!el) return '';
+    if(window.EditableHelper && typeof EditableHelper.getText==='function'){
+      try{ return EditableHelper.getText(el) || ''; }catch(e){}
+    }
+    return (el.value!==undefined)?el.value: (el.innerText||'');
+  }
+
   // Send a ready message to the background script
   try {
     chrome.runtime.sendMessage({ action: 'content_script_ready' }, function(response) {
@@ -2169,5 +2495,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.error('Error sending ready message:', error);
   }
   // Close the IIFE function wrapper
-})();
-}
+}})};
