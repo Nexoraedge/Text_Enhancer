@@ -300,55 +300,144 @@ function replaceContentEditable(el, newText) {
   el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: newText }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
+function forceReactSync(element, newText) {
+  // Find React instance
+  const getReactInstance = (el) => {
+    for (const key in el) {
+      if (key.startsWith('__reactInternalInstance$') || key.startsWith('__reactFiber$')) {
+        return el[key];
+      }
+    }
+    return null;
+  };
+  
+  const reactInstance = getReactInstance(element);
+  if (reactInstance) {
+    // Try to access React's internal state updater
+    const fiber = reactInstance;
+    if (fiber && fiber.stateNode) {
+      // Force component update
+      if (fiber.stateNode.forceUpdate) {
+        fiber.stateNode.forceUpdate();
+      }
+    }
+  }
+  
+  // Trigger multiple sync events
+  const events = ['input', 'change', 'blur', 'focus'];
+  events.forEach(eventType => {
+    element.dispatchEvent(new Event(eventType, { bubbles: true }));
+  });
+}
 
 function twitterRewrite(el, newText) {
   if (!el) return false;
   try {
     el.focus();
-    // Select all existing content
-    const sel = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    // Clear via delete
-    document.execCommand('delete');
-
-    // Attempt direct insert
-    const inserted = document.execCommand('insertText', false, newText);
-    if (!inserted) {
-      // Fallback: synthetic paste
-      const dt = new DataTransfer();
-      dt.setData('text/plain', newText);
-      el.dispatchEvent(
-        new ClipboardEvent('paste', { bubbles: true, clipboardData: dt })
-      );
-      // Hard set as last resort
-      el.textContent = newText;
+    
+    // Method 1: Native React input setter (most reliable)
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+    const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+    
+    // Try to find React fiber node and update state directly
+    const reactProps = el._reactInternalFiber || el._reactInternals || el.__reactInternalInstance;
+    if (reactProps) {
+      // Clear existing content via selection + delete so DraftJS state resets correctly
+      const selDraft = window.getSelection();
+      const rangeDraft = document.createRange();
+      rangeDraft.selectNodeContents(el);
+      selDraft.removeAllRanges();
+      selDraft.addRange(rangeDraft);
+      document.execCommand('delete');
+      // Insert using execCommand so DraftJS builds proper child nodes
+      document.execCommand('insertText', false, newText);
+      
+      // Trigger React's onChange handler directly if available
+      const onChange = reactProps.memoizedProps?.onChange || reactProps.pendingProps?.onChange;
+      if (onChange) {
+        onChange({ target: { value: newText } });
+      }
+    } else {
+      // Fallback: DOM manipulation with enhanced events
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      
+      // Clear content
+      document.execCommand('delete');
+      
+      // Insert new text
+      document.execCommand('insertText', false, newText);
     }
+    
+    // Enhanced event dispatch for React sync
+    const inputEvents = [
+      new InputEvent('beforeinput', { bubbles: true, inputType: 'insertText', data: newText }),
+      new InputEvent('input', { bubbles: true, inputType: 'insertText', data: newText }),
+      new Event('change', { bubbles: true }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }),
+      new FocusEvent('blur', { bubbles: true }),
+      new FocusEvent('focus', { bubbles: true })
+    ];
+    
+    inputEvents.forEach(event => {
+      try {
+        el.dispatchEvent(event);
+      } catch (e) {
+        console.warn('Event dispatch failed:', e);
+      }
+    });
+    
+    // Force React re-render by triggering state change
+    setTimeout(() => {
+      el.dispatchEvent(new InputEvent('input', { 
+        bubbles: true, 
+        inputType: 'insertText', 
+        data: newText 
+      }));
+      
+      // Additional React sync tricks
+      const reactEvent = new Event('input', { bubbles: true });
+      reactEvent.simulated = true;
+      el.dispatchEvent(reactEvent);
+      
+    }, 50);
 
-    // Fire React/DraftJS-friendly events
-    el.dispatchEvent(
-      new InputEvent('input', {
-        bubbles: true,
-        inputType: 'insertText',
-        data: newText,
-      })
-    );
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    // Nudge DraftJS to commit: type space then backspace
-    dispatchKeystroke(el, ' ', 'Space');
-    dispatchKeystroke(el, 'Backspace', 'Backspace');
-    // Blur & refocus to ensure state commits
-    el.blur();
-    setTimeout(()=>el.focus(), 20);
+    // Also update hidden textareas used by Twitter's composer so backend state matches
+    const textareas = document.querySelectorAll('textarea[data-testid^="tweetTextarea"]');
+    textareas.forEach(ta => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+      if (setter) {
+        setter.call(ta, newText);
+      } else {
+        ta.value = newText;
+      }
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      ta.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Ensure element remains editable and place caret at end for user to continue typing
+    if (el.contentEditable !== 'true') {
+      el.setAttribute('contenteditable', 'true');
+    }
+    const selAfter = window.getSelection();
+    if (selAfter) {
+      selAfter.removeAllRanges();
+      const rangeEnd = document.createRange();
+      rangeEnd.selectNodeContents(el);
+      rangeEnd.collapse(false);
+      selAfter.addRange(rangeEnd);
+    }
+    el.focus();
+
     return true;
   } catch (err) {
     console.error('[TE] twitterRewrite failed:', err);
     return false;
   }
 }
-
 function replaceInstagramEditable(el, newText) {
   if (!el) return;
   el.focus();
@@ -480,8 +569,29 @@ function setTextInFocusedElement(element, text, params = null) {
         } catch(err){ console.error('Instagram replace failed', err); }
       }
       if (host.endsWith('twitter.com') || host.endsWith('x.com')) {
-        const box = document.querySelector('div[role="textbox"][contenteditable="true"]');
-        if (twitterRewrite(box || targetEditable, text)) {
+        const box = document.querySelector('div[role="textbox"][contenteditable="true"]') ||
+                    document.querySelector('[data-testid="tweetTextarea_0"]') ||
+                    document.querySelector('div[contenteditable="true"][data-testid*="tweet"]') ||
+                    targetEditable;
+        
+        if (box && twitterRewrite(box, text)) {
+          // Additional sync after successful rewrite
+          setTimeout(() => {
+            forceReactSync(box, text);
+            
+            // Final sync check - if frontend still doesn't match, force refresh
+            setTimeout(() => {
+              if (box.textContent !== text) {
+                box.textContent = text;
+                box.dispatchEvent(new InputEvent('input', { 
+                  bubbles: true, 
+                  inputType: 'insertText', 
+                  data: text 
+                }));
+              }
+            }, 100);
+          }, 100);
+          
           renderActionBar(element);
           return true;
         }
@@ -1477,6 +1587,7 @@ function showCustomPromptPopup() {
 // Function to show context enhancer popup
 function showContextEnhancerPopup() {
   addContextEnhancerStyles()
+  addCustomStyles();
   // Create popup container
   const popup = document.createElement('div');
   popup.className = 'text-enhancer-context-popup';
@@ -2275,9 +2386,9 @@ function revertAction(){
             const query=textarea.value.trim();
             if(!query) return;
             showToast('Asking AI...','info',0);
-            safeSend({action:'ai-write', prompt: query},res=>{
+            safeSend({action: 'ai-write', customPrompt: query, text: '', includeEmojis: false}, res => {
               if(res && res.success){
-                insertEnhanced(res.generatedText||res.enhancedText||'');
+                insertEnhanced(res.generatedText || res.enhancedText || '');
                 showToast('Enhanced ✅','info',2000);
               }else{
                 showToast(res?.error||'AI request failed','error',3000);

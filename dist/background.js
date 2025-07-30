@@ -17,7 +17,7 @@ Guidelines:
 
 Text to enhance: "{text}"
 
-Improved text:`,s={professional:`Transform the following text into a professional, polished version suitable for business communication.
+Improved text:`,l={professional:`Transform the following text into a professional, polished version suitable for business communication.
 
 Guidelines:
 - Use formal language and proper business etiquette
@@ -94,7 +94,7 @@ Guidelines:
 
 Original text: "{text}"
 
-Empathetic version:`},l={email:`Enhance this text for email communication. Make it clear, professional, and well-structured.
+Empathetic version:`},c={email:`Enhance this text for email communication. Make it clear, professional, and well-structured.
 
 Guidelines:
 - Use proper email etiquette
@@ -151,7 +151,7 @@ Guidelines:
 - Make it engaging and well-written
 - Keep it appropriate length for the context
 
-Generated text:`},c={instagram:`Rewrite the following text so it feels like a natural chat. Provide exactly ONE rewritten version – no bullet points, no numbering, no Markdown formatting.
+Generated text:`},p={instagram:`Rewrite the following text so it feels like a natural chat. Provide exactly ONE rewritten version – no bullet points, no numbering, no Markdown formatting.
 
 Guidelines:
 - Use friendly, conversational language
@@ -206,12 +206,19 @@ Guidelines:
 
 Text: "{text}"
 
-LinkedIn optimized:`};function g(e,n){return`${e}
+LinkedIn optimized:`};function g(e,i){return`${e}
 
-Text to enhance: "${n}"
+Text to enhance: "${i}"
 
-Enhanced text:`}function f(e,n={}){const{customPrompt:a,tone:t,context:r,platform:o,action:u}=n;let i=null;return a&&(i=g(a,e)),!i&&u==="context-enhancer"&&r&&(i=m.generate_from_context.replace("{context}",r).replace("{request}",e).replace("{tone}",t||"natural")),!i&&o&&c[o]&&(i=c[o].replace("{text}",e)),!i&&r&&l[r]&&(i=l[r].replace("{text}",e)),!i&&t&&s[t]&&(i=s[t].replace("{text}",e)),i||(i=h.replace("{text}",e)),`${i}
+Enhanced text:`}function f(e){return`${e}
 
-Respond with only the final enhanced text, without explanations.`}function x(e){return`${e}
+Guidelines:
+- Do NOT provide any options or lists
+- Respond with only the requested content (no preamble, no explanations, no suggestions)
+- Do not add phrases like "Here is your result" or similar
 
-Additional instruction: Add appropriate emojis to enhance the text, but use them sparingly and only where they naturally fit.`}async function y(e,n={}){const t=await(await fetch("https://tone-genie.vercel.app/api/enhance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:e,options:n})})).json();if(t.success)return t.enhancedText;throw new Error(t.error||"Enhancement failed")}const p="https://tone-genie.vercel.app/",w="https://tone-genie.vercel.app/feedback";chrome.runtime.onInstalled.addListener(e=>{chrome.runtime.setUninstallURL(w,()=>{chrome.runtime.lastError&&console.error("Failed to set uninstall URL:",chrome.runtime.lastError)});try{e.reason==="install"?chrome.tabs.create({url:p}):e.reason==="update"&&chrome.tabs.create({url:`${p}?updated=1`})}catch(n){console.error("Error opening landing page:",n)}});chrome.commands.onCommand.addListener(e=>{const n={"quick-enhance":{action:"enhance-text"},"custom-prompt":{action:"show-custom-prompt"},"context-generator":{action:"show-context-enhancer"},"open-main-popup":{action:"open-main-popup"}};if(n[e]){if(e==="open-main-popup"){chrome.action.openPopup().catch(a=>console.error("Failed to open action popup:",a));return}chrome.tabs.query({active:!0,currentWindow:!0},async a=>{if(a[0])try{await v(a[0].id),chrome.tabs.sendMessage(a[0].id,n[e],t=>{chrome.runtime.lastError&&(console.error("Error sending message:",chrome.runtime.lastError.message),d(a[0].id,n[e]))})}catch(t){console.error(`Error in ${e} command:`,t)}})}else console.warn("Unrecognized keyboard shortcut command:",e)});async function v(e){try{await chrome.tabs.sendMessage(e,{action:"ping"})}catch{await d(e)}}async function d(e,n=null){try{await chrome.scripting.executeScript({target:{tabId:e},files:["content.js"]}),n&&setTimeout(()=>{chrome.tabs.sendMessage(e,n,a=>{chrome.runtime.lastError&&console.error("Error sending message after injection:",chrome.runtime.lastError.message)})},500)}catch(a){console.error("Error injecting content script:",a)}}chrome.runtime.onMessage.addListener((e,n,a)=>{if(e.action==="enhance-text-with-gemini"||e.action==="enhanceTextFromPopup"||e.action==="enhance-text"||e.action==="custom-prompt"||e.action==="context-enhancer"||e.action==="ai-write")return(async()=>{try{let t=f(e.text,{customPrompt:e.customPrompt,tone:e.tone,context:e.context,platform:e.platform,action:e.action});e.includeEmojis&&(t=x(t));let r=e.action==="ai-write"?e.prompt||" ":e.text||"";const o=await y(r,{prompt:t,includeEmojis:!1,contextType:e.context||"general"});a({success:!0,enhancedText:o})}catch(t){console.error("Error enhancing text:",t),a({success:!1,error:t.message})}})(),!0});
+Result:`}function x(e,i={}){const{customPrompt:t,tone:n,context:r,platform:o,action:s}=i;if(s==="ai-write"&&t)return f(t);let a=null;return t&&(a=g(t,e)),!a&&s==="context-enhancer"&&r&&(a=m.generate_from_context.replace("{context}",r).replace("{request}",e).replace("{tone}",n||"natural")),!a&&o&&p[o]&&(a=p[o].replace("{text}",e)),!a&&r&&c[r]&&(a=c[r].replace("{text}",e)),!a&&n&&l[n]&&(a=l[n].replace("{text}",e)),a||(a=h.replace("{text}",e)),`${a}
+
+Respond with only the final enhanced text, without explanations.`}function y(e){return`${e}
+
+Additional instruction: Add appropriate emojis to enhance the text, but use them sparingly and only where they naturally fit.`}async function w(e,i={}){const n=await(await fetch("https://tone-genie.vercel.app/api/enhance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:e,options:i})})).json();if(n.success)return n.enhancedText;throw new Error(n.error||"Enhancement failed")}const d="https://tone-genie.vercel.app/",v="https://tone-genie.vercel.app/feedback";chrome.runtime.onInstalled.addListener(e=>{chrome.runtime.setUninstallURL(v,()=>{chrome.runtime.lastError&&console.error("Failed to set uninstall URL:",chrome.runtime.lastError)});try{e.reason==="install"?chrome.tabs.create({url:d}):e.reason==="update"&&chrome.tabs.create({url:`${d}?updated=1`})}catch(i){console.error("Error opening landing page:",i)}});chrome.commands.onCommand.addListener(e=>{const i={"quick-enhance":{action:"enhance-text"},"custom-prompt":{action:"show-custom-prompt"},"context-generator":{action:"show-context-enhancer"},"open-main-popup":{action:"open-main-popup"}};if(i[e]){if(e==="open-main-popup"){chrome.action.openPopup().catch(t=>console.error("Failed to open action popup:",t));return}chrome.tabs.query({active:!0,currentWindow:!0},async t=>{if(t[0])try{await b(t[0].id),chrome.tabs.sendMessage(t[0].id,i[e],n=>{chrome.runtime.lastError&&(console.error("Error sending message:",chrome.runtime.lastError.message),u(t[0].id,i[e]))})}catch(n){console.error(`Error in ${e} command:`,n)}})}else console.warn("Unrecognized keyboard shortcut command:",e)});async function b(e){try{await chrome.tabs.sendMessage(e,{action:"ping"})}catch{await u(e)}}async function u(e,i=null){try{await chrome.scripting.executeScript({target:{tabId:e},files:["content.js"]}),i&&setTimeout(()=>{chrome.tabs.sendMessage(e,i,t=>{chrome.runtime.lastError&&console.error("Error sending message after injection:",chrome.runtime.lastError.message)})},500)}catch(t){console.error("Error injecting content script:",t)}}chrome.runtime.onMessage.addListener((e,i,t)=>{if(e.action==="enhance-text-with-gemini"||e.action==="enhanceTextFromPopup"||e.action==="enhance-text"||e.action==="custom-prompt"||e.action==="context-enhancer"||e.action==="ai-write")return(async()=>{try{let n=x(e.text,{customPrompt:e.customPrompt,tone:e.tone,context:e.context,platform:e.platform,action:e.action});e.includeEmojis&&(n=y(n));let r=e.action==="ai-write"?e.prompt||" ":e.text||"";const o=await w(r,{prompt:n,includeEmojis:!1,contextType:e.context||"general"});t({success:!0,enhancedText:o})}catch(n){console.error("Error enhancing text:",n),t({success:!1,error:n.message})}})(),!0});

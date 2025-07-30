@@ -283,10 +283,21 @@ Text to enhance: "${text}"
 Enhanced text:`;
 }
 
+// 4b. AI-WRITE (FREEFORM GENERATION) PROMPT HANDLER
+export function buildAIWritePrompt(userPrompt) {
+  return `
+  You are an expert in writing and conversation now , ${userPrompt}\n\nGuidelines:\n- Do NOT provide any options or lists\n-Write things good that it feels to read like written by somone smart while kepping the tone perfect and sync\n - Make sure to write it as Humanized \n- Respond with only the requested content (no preamble, no explanations, no suggestions)\n- Do not add phrases like "Here is your result" or similar\n\nResult:`;
+}
+
 // 7. MAIN PROMPT BUILDER FUNCTION
 // 7. MAIN PROMPT BUILDER FUNCTION (always ends with strict output instruction)
 export function buildEnhancementPrompt(text, options = {}) {
   const { customPrompt, tone, context, platform, action } = options;
+
+  // Special case: AI-write command should ignore existing text and use only the user's prompt with strict rules
+  if (action === 'ai-write' && customPrompt) {
+    return buildAIWritePrompt(customPrompt);
+  }
 
   let basePrompt = null;
 
@@ -323,3 +334,5 @@ export function addEmojiPrompt(basePrompt) {
 
 Additional instruction: Add appropriate emojis to enhance the text, but use them sparingly and only where they naturally fit.`;
 }
+
+
