@@ -210,10 +210,13 @@ LinkedIn optimized:`};function g(e,i){return`${e}
 
 Text to enhance: "${i}"
 
-Enhanced text:`}function f(e){return`${e}
+Enhanced text:`}function f(e){return`
+  You are an expert in writing and conversation now , ${e}
 
 Guidelines:
 - Do NOT provide any options or lists
+-Write things good that it feels to read like written by somone smart while kepping the tone perfect and sync
+ - Make sure to write it as Humanized 
 - Respond with only the requested content (no preamble, no explanations, no suggestions)
 - Do not add phrases like "Here is your result" or similar
 

@@ -32,29 +32,7 @@ if (window.__TEXT_ENHANCER_LOADED__) {
 
 let focusedElement = null; // Will always be assigned safely before use
 
-// Inject shared theme CSS into the page (once)
-function injectPlaceholderStyles(){
-  const id='text-enhancer-placeholder-styles';
-  if(document.getElementById(id)) return;
-  const style=document.createElement('style');
-  style.id=id;
-  style.textContent=`
-    /* Ensure textarea/input in pop-ups always use white text on black background */
-    .text-enhancer-textarea,
-    textarea.text-enhancer-textarea,
-    input.text-enhancer-input {
-      color:#ffffff !important;
-      background:#000000 !important;
-    }
-    .text-enhancer-textarea::placeholder,
-    textarea.text-enhancer-textarea::placeholder,
-    input.text-enhancer-input::placeholder {
-      color:#ffffff !important;
-      opacity:0.8;
-    }
-  `;
-  document.head.appendChild(style);
-}
+
 
 function injectTheme() {
   try {
@@ -204,9 +182,6 @@ function isEditableElement(element) {
 }
 
 
-
-
-
 // Bundle helper functions for easier consumption elsewhere
 const EditableHelper = {
   isEditableElement,
@@ -227,7 +202,6 @@ A.setTextInElement = function(el, text, params) {
   const orig = A.getTextFromElement(el);
   const ok = originalSetter ? originalSetter(el, text, params) : false;
   showToast('Inserted ✅', 'info', 2000);
-  createRevertBar(el, orig);
   return ok;
 };
 window.TextEnhancerEditable = A;
@@ -515,7 +489,7 @@ function setTextInFocusedElement(element, text, params = null) {
     element.dispatchEvent(changeEvent);
     element.dispatchEvent(keyupEvent);
     
-    renderActionBar(element);
+     renderActionBar(element);
     return true;
   // ---- CONTENTEDITABLE surfaces (WhatsApp, Instagram DM, etc.) ----
   } else if (element.isContentEditable || element.hasAttribute('contenteditable')) {
@@ -553,7 +527,7 @@ function setTextInFocusedElement(element, text, params = null) {
       if (host.endsWith('whatsapp.com')) {
         try {
           replaceViaKeystrokes(targetEditable, text);
-          renderActionBar(element);
+           renderActionBar(element);
           return true;
         } catch(err) {
           console.error('WhatsApp replace failed, falling back:', err);
@@ -564,7 +538,7 @@ function setTextInFocusedElement(element, text, params = null) {
           // Instagram uses Lexical editor; target the element with data-lexical-editor if present to avoid duplicate insertion
           const igEditable = (targetEditable && targetEditable.querySelector('[data-lexical-editor="true"]')) || rootEditable || targetEditable;
           replaceInstagramEditable(igEditable, text);
-          renderActionBar(element);
+           renderActionBar(element);
           return true;
         } catch(err){ console.error('Instagram replace failed', err); }
       }
@@ -592,7 +566,7 @@ function setTextInFocusedElement(element, text, params = null) {
             }, 100);
           }, 100);
           
-          renderActionBar(element);
+           renderActionBar(element);
           return true;
         }
       }
@@ -606,14 +580,14 @@ function setTextInFocusedElement(element, text, params = null) {
             return false; // let fallback handle
           }
           replaceInstagramEditable(rootIg, text);
-          renderActionBar(element);
+           renderActionBar(element);
           console.log('[TE] Instagram DM replacement via IG helper done');
           return true;
         } catch(err){ console.error('Instagram replace failed', err);} 
       }
       // ----- Generic contenteditable replacement (other sites) -----
       replaceContentEditable(rootEditable || targetEditable, text);
-      renderActionBar(element);
+       renderActionBar(element);
       return true;
     }
   }
@@ -1147,8 +1121,6 @@ function showCustomPromptPopup() {
   
   const tabs = [
     { id: 'custom', text: 'Custom Prompt', icon: '✏️' },
-    { id: 'templates', text: 'Templates', icon: '📋' },
-    { id: 'freelance', text: 'Freelance', icon: '💼' },
     { id: 'tone', text: 'Tone & Style', icon: '🎨' }
   ];
   
@@ -1568,8 +1540,6 @@ function showCustomPromptPopup() {
   
   // Add all tab content to content container
   contentContainer.appendChild(customTabContent);
-  contentContainer.appendChild(templatesTabContent);
-  contentContainer.appendChild(freelanceTabContent);
   contentContainer.appendChild(toneTabContent);
   
   // Add elements to popup
@@ -2263,8 +2233,7 @@ function revertAction(){
       else { currentEl.innerText = text; }
       ['input','change'].forEach(evt=>{ currentEl.dispatchEvent(new Event(evt,{bubbles:true})); });
       // success feedback
-      showToast('Enhanced ☑️','info',2000);
-      createRevertBar(currentEl, lastOriginalText);
+      showToast('Enhanced ☑️','info',2000);    
     }
 
     actions.forEach(({label,key})=>{
@@ -2275,7 +2244,7 @@ function revertAction(){
           const text = getTextFromFocusedElement(currentEl);
           showToast('Enhancing...','info',0);
           safeSend({action:'enhance-text', text}, (response) => {
-            if(response && response.success){ insertEnhanced(response.enhancedText); showToast('Enhanced ☑️','info',2000); }
+            if(response && response.success){ insertEnhanced(response.enhancedText); showToast('Enhanced ☑️','info',2000);  }
             else { showToast(response.error||'Enhancement failed','error',3000); }
             removeQA();
           });
@@ -2512,70 +2481,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   window.safeSend = safeSend;
 
-  // ------------ GLOBAL REVERT BAR ------------
-  function createRevertBar(targetEl, originalText){
-    if(!targetEl || document.querySelector('.te-revert-bar')) return;
-    const bar=document.createElement('div');
-    bar.className='te-revert-bar';
-    bar.style=`position:absolute;z-index:2147483647;background:linear-gradient(135deg,#4c4b8e,#6d57a5);color:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.2);padding:6px 10px;font-size:12px;font-family:sans-serif;display:flex;gap:8px;align-items:center;cursor:move;user-select:none;`;
-    const undoBtn=document.createElement('button');undoBtn.textContent='Undo';
-    const regenBtn=document.createElement('button');regenBtn.textContent='Regenerate';
-    const closeBtn=document.createElement('span');closeBtn.textContent='✕';closeBtn.style.cursor='pointer';closeBtn.style='color:#fff;font-weight:bold;'
-    ;[undoBtn,regenBtn].forEach(b=>b.style='padding:2px 6px;font-size:12px;');
-    bar.appendChild(undoBtn);bar.appendChild(regenBtn);bar.appendChild(closeBtn);
-    document.body.appendChild(bar);
-    function place(){
-      const rect=targetEl.getBoundingClientRect();
-      const below=window.scrollY+rect.bottom+6;
-      const above=window.scrollY+rect.top-bar.offsetHeight-6;
-      bar.style.top=`${above>0?above:below}px`;
-      bar.style.left=`${window.scrollX+rect.left}px`;
-    }
-    place();
-    // drag
-    let offX=0,offY=0,drag=false;
-    bar.addEventListener('mousedown',e=>{drag=true;offX=e.clientX-parseInt(bar.style.left);offY=e.clientY-parseInt(bar.style.top);e.preventDefault();});
-    document.addEventListener('mousemove',e=>{if(drag){bar.style.left=`${e.clientX-offX}px`;bar.style.top=`${e.clientY-offY}px`;}});
-    document.addEventListener('mouseup',()=>drag=false);
-    // actions
-    undoBtn.onclick=()=>{if(window.EditableHelper&&EditableHelper.replaceText){try{EditableHelper.replaceText(targetEl,originalText);}catch{targetEl.value!==undefined?targetEl.value=originalText:targetEl.innerText=originalText;} ['input','change'].forEach(evt=>targetEl.dispatchEvent(new Event(evt,{bubbles:true}))); bar.remove();};
-    regenBtn.onclick=()=>{showToast('Regenerating...','info',0); safeSend({action:'enhance-text', text:originalText},res=>{if(res&&res.success){ if(window.EditableHelper&&EditableHelper.replaceText){try{EditableHelper.replaceText(targetEl,res.enhancedText);}catch{targetEl.value!==undefined?targetEl.value=res.enhancedText:targetEl.innerText=res.enhancedText;} ['input','change'].forEach(evt=>targetEl.dispatchEvent(new Event(evt,{bubbles:true})) ); showToast('Inserted ✅','info',2000); place(); } } else { showToast(res.error||'Enhancement failed','error',3000);} });};
-    closeBtn.onclick=()=>bar.remove();
-  }
-  window.TextEnhancerUI = { createRevertBar };
-
-  function showToast(msg, type='info', duration=3000){
-    if(activeToast){activeToast.remove();activeToast=null;}
-    const div=document.createElement('div');
-    div.textContent=msg;
-    div.className='te-toast';
-    div.style=`position:fixed;bottom:24px;right:24px;z-index:2147483647;padding:8px 12px;border-radius:4px;font-size:13px;color:#fff;background:${type==='error'?'#d9534f':'#333'};box-shadow:0 2px 6px rgba(0,0,0,.3);opacity:0;transition:opacity .2s`; 
-    document.body.appendChild(div);
-    requestAnimationFrame(()=>{div.style.opacity='1';});
-    activeToast=div;
-    if(duration>0){ setTimeout(()=>{div.style.opacity='0';setTimeout(()=>div.remove(),200);activeToast=null;}, duration); }
-  }
-
-  // Helper to safely retrieve text from editable element
-  function getTextFromFocusedElement(el){
-    if(!el) return '';
-    if(window.EditableHelper && typeof EditableHelper.getText==='function'){
-      try{ return EditableHelper.getText(el) || ''; }catch(e){}
-    }
-    return (el.value!==undefined)?el.value: (el.innerText||'');
-  }
-
-  // Send a ready message to the background script
-  try {
-    chrome.runtime.sendMessage({ action: 'content_script_ready' }, function(response) {
-      if (chrome.runtime.lastError) {
-        //console.log('Background script not ready yet:', chrome.runtime.lastError.message);
-      } else {
-        //console.log('Connection with background script established');
-      }
-    });
-  } catch (error) {
-    console.error('Error sending ready message:', error);
-  }
-  // Close the IIFE function wrapper
-}})};
+})};
