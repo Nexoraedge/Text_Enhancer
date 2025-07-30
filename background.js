@@ -1,4 +1,5 @@
 // Text enhancement via backend proxy (no API key needed)
+import { buildEnhancementPrompt, addEmojiPrompt } from './src/utils/prompts.js';
 async function enhanceTextWithProxy(text, options = {}) {
   const response = await fetch('https://tone-genie.vercel.app/api/enhance', {
     method: 'POST',
@@ -9,7 +10,7 @@ async function enhanceTextWithProxy(text, options = {}) {
   if (data.success) return data.enhancedText;
   throw new Error(data.error || 'Enhancement failed');
 }
-import { buildEnhancementPrompt, addEmojiPrompt } from './src/utils/prompts.js';
+
 
 
 // Website integration (landing/help, privacy, feedback)
@@ -109,18 +110,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     message.action === 'enhanceTextFromPopup' ||
     message.action === 'enhance-text' ||
     message.action === 'custom-prompt' ||
-    message.action === 'context-enhancer'
+    message.action === 'context-enhancer' ||
+    message.action === 'ai-write'
   ) {
-    // Route all enhancement requests through the backend proxy
     (async () => {
       try {
-        // API key no longer required; backend handles authentication.
-        const apiKey = undefined;
-
-        const context = {
-          url: sender.tab ? sender.tab.url : '',
-          title: sender.tab ? sender.tab.title : '',
-        };
+        // const context = {
+        //   url: sender.tab ? sender.tab.url : '',
+        //   title: sender.tab ? sender.tab.title : '',
+        // };
 
         // Construct prompt dynamically to keep tone and apply rules
         let prompt = buildEnhancementPrompt(message.text, {
@@ -136,7 +134,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           prompt = addEmojiPrompt(prompt);
         }
 
-        const enhancedText = await enhanceTextWithProxy(message.text, {
+        let baseText = (message.action==='ai-write') ? (message.prompt || ' ') : (message.text || '');
+        const enhancedText = await enhanceTextWithProxy(baseText, {
           prompt: prompt,
           includeEmojis: false, // already embedded via prompt if requested
           contextType: message.context || 'general',

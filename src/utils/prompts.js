@@ -1,16 +1,20 @@
 // Generated prompt utilities for Text-Enhancer
 // --------------------------------------------
 // 1. QUICK ENHANCE PROMPT
-export const QUICK_ENHANCE_PROMPT = `You are a skilled text enhancer. Improve the following text while keeping it natural and authentic.
-
+export const QUICK_ENHANCE_PROMPT = `You are a skilled Writer. Improve the following text while keeping it natural and authentic.
 Guidelines:
+- Do Not inlcude Hashtags
 - Fix grammar, spelling, and punctuation
 - Improve clarity and flow
 - Keep the original tone and personality
 - Make it more engaging but not overly dramatic
+- keep things Cathy and Feels Fastastic to read .
+- Use Line gaps and all to make it more readable.
+- don't Overdo things .
+- Make sure to convey message in engaing way.
+- For paragrahs and vast content use line gaps for better readability
 - Use emojis sparingly (1-2 max) and only if they fit naturally
 - Avoid excessive hashtags or repetitive phrases
-- Keep the same general length
 - Make it sound human and genuiney
 - Return ONLY the improved text
 
@@ -206,11 +210,12 @@ Rewritten text:`
 
 // 6. PLATFORM-SPECIFIC PROMPTS
 export const PLATFORM_PROMPTS = {
-  instagram: `Rewrite the following text for an Instagram Direct Message so it feels like a natural chat. Provide exactly ONE rewritten version – no bullet points, no numbering, no Markdown formatting.
+  instagram: `Rewrite the following text so it feels like a natural chat. Provide exactly ONE rewritten version – no bullet points, no numbering, no Markdown formatting.
 
 Guidelines:
 - Use friendly, conversational language
-- Keep it short and mobile-friendly (1-3 sentences)
+- keep things Cathy and Feels Fastastic to read .
+- Make sure to convey message in engaing way.
 - Add relevant emojis if they enhance the message, but don't overdo it
 - Do NOT add email-style elements such as “Subject:”, greetings like “Dear…”, or sign-offs
 - Preserve the original intent and personality
@@ -218,30 +223,40 @@ Guidelines:
 Text: "{text}"
 
 Rewritten DM:`,
-  X: `Optimize this text for Twitter/X platform. Make it concise, engaging.
+
+twitter: `You are a skilled Writer. Improve the following text while keeping it natural and authentic.
+
+STRICT RULE: Do NOT include any hashtags (no # symbols) anywhere in the rewritten text.
 
 Guidelines:
 - Keep it concise and punchy
 - Tone must not be changed
+- keep things Cathy and Feels Fastastic to read .
+- Make sure to convey message in engaing way.
 - Ensure clarity in limited characters  , must be in X word limit .
 - Make it conversation-worthy.
-- No need to use keywords unless earlier mentioned.
+- No need to use Hashtags.
+- Write it as normal not as a Post as user can use it to chat with someone.
 
 Text: "{text}"
 
-X optimized:`,
+X optimized:`
+,
   whatsapp: `Optimize this text for WhatsApp messaging. Make it conversational and natural.
 
 Guidelines:
 - Use natural, conversational tone
+- imporve the grammer and spellings
 - Keep it appropriate for messaging
 - Make it friendly and approachable
 - Ensure easy readability on mobile
 - Maintain personal touch
+- Ensure line gaps when writing a paragrh or long content for better readability.
 
 Text: "{text}"
 
 WhatsApp optimized:`,
+
   linkedin: `Optimize this text for LinkedIn professional networking. Make it professional and engaging.
 
 Guidelines:
@@ -249,6 +264,9 @@ Guidelines:
 - Make it networking-appropriate
 - Add professional value
 - Keep it engaging for business context
+- Make sure to write it in High energy
+- The tone should be positive.
+- Must Look Natural.
 - Maintain professional credibility
 
 Text: "{text}"

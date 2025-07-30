@@ -8,8 +8,22 @@ if (window.__TEXT_ENHANCER_LOADED__) {
   window.__TEXT_ENHANCER_LOADED__ = true;
   // Ensure global safeSend exists before modules reference it
   if(!window.safeSend){
-    window.safeSend = (message, callback)=>{
-      try{ chrome.runtime.sendMessage(message, callback);}catch(e){ console.warn('safeSend placeholder error', e); }
+    window.safeSend = function safeSend(message, callback, attempt=1){
+      try{
+        chrome.runtime.sendMessage(message,(res)=>{
+          if(chrome.runtime.lastError && /context invalidated/i.test(chrome.runtime.lastError.message) && attempt<3){
+            console.warn('[TE] safeSend placeholder retry', attempt);
+            return setTimeout(()=>safeSend(message, callback, attempt+1), 200*attempt);
+          }
+          callback && callback(res);
+        });
+      }catch(e){
+        if(attempt<3){
+          console.warn('[TE] safeSend placeholder retry throw', attempt);
+          return setTimeout(()=>safeSend(message, callback, attempt+1), 200*attempt);
+        }
+        console.warn('safeSend placeholder error', e);
+      }
     };
   }
 
@@ -289,109 +303,51 @@ function replaceContentEditable(el, newText) {
 
 function twitterRewrite(el, newText) {
   if (!el) return false;
-  el.focus();
-  // Clear existing content (Ctrl/⌘+A then Backspace)
-  dispatchKeystroke(el, 'a', 'KeyA', true);
-  dispatchKeystroke(el, 'Backspace', 'Backspace');
-  // Paste the new text via synthetic clipboard event so DraftJS updates its store
-  const dt = new DataTransfer();
-  dt.setData('text/plain', newText);
-  el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
-  // Fire React-friendly events to confirm change
-  el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: newText }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-  return true;
-}
-
-function replaceTwitterEditable(el, newText) {
-  if (!el) return false;
   try {
-    console.debug('[TE] Twitter replacement starting for:', newText);
     el.focus();
-    
-    // Method 1: Try React's internal value setter first
-    const reactProps = Object.keys(el).find(key => key.startsWith('__reactProps') || key.startsWith('__reactInternalInstance'));
-    if (reactProps && el[reactProps]) {
-      try {
-        const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set ||
-                           Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        if (valueSetter) {
-          valueSetter.call(el, newText);
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          console.debug('[TE] React value setter used');
-          return true;
-        }
-      } catch (reactErr) {
-        console.debug('[TE] React setter failed, trying DOM approach');
-      }
-    }
-    
-    // Method 2: Full DOM manipulation with multiple sync attempts
-    // Clear completely
-    el.innerHTML = '';
-    el.textContent = '';
-    el.innerText = '';
-    
-    // Select all and delete (DraftJS state clear)
+    // Select all existing content
     const sel = window.getSelection();
-    sel.selectAllChildren(el);
-    document.execCommand('delete', false, null);
-    
-    // Insert new text via multiple methods
-    const success1 = document.execCommand('insertText', false, newText);
-    if (!success1) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    // Clear via delete
+    document.execCommand('delete');
+
+    // Attempt direct insert
+    const inserted = document.execCommand('insertText', false, newText);
+    if (!inserted) {
       // Fallback: synthetic paste
       const dt = new DataTransfer();
       dt.setData('text/plain', newText);
-      el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+      el.dispatchEvent(
+        new ClipboardEvent('paste', { bubbles: true, clipboardData: dt })
+      );
+      // Hard set as last resort
+      el.textContent = newText;
     }
-    
-    // Force DOM update
-    el.textContent = newText;
-    el.innerText = newText;
-    
-    // Fire all possible events to sync React/DraftJS
-    const events = [
-      new InputEvent('beforeinput', { inputType: 'insertText', data: newText, bubbles: true }),
-      new InputEvent('input', { inputType: 'insertText', data: newText, bubbles: true }),
-      new Event('change', { bubbles: true }),
-      new Event('blur', { bubbles: true }),
-      new Event('focus', { bubbles: true })
-    ];
-    
-    events.forEach(evt => {
-      try { el.dispatchEvent(evt); } catch (e) { /* ignore */ }
-    });
-    
-    // Multiple focus/blur cycles to force React reconciliation
+
+    // Fire React/DraftJS-friendly events
+    el.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: newText,
+      })
+    );
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    // Nudge DraftJS to commit: type space then backspace
+    dispatchKeystroke(el, ' ', 'Space');
+    dispatchKeystroke(el, 'Backspace', 'Backspace');
+    // Blur & refocus to ensure state commits
     el.blur();
-    setTimeout(() => {
-      el.focus();
-      // Final verification and force-set
-      if (el.innerText !== newText) {
-        el.innerText = newText;
-        el.textContent = newText;
-        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: newText }));
-      }
-      
-      // Trigger a space and backspace to wake up DraftJS
-      setTimeout(() => {
-        dispatchKeystroke(el, ' ', 'Space');
-        setTimeout(() => {
-          dispatchKeystroke(el, 'Backspace', 'Backspace');
-        }, 10);
-      }, 50);
-    }, 100);
-    
-    console.debug('[TE] Twitter replacement completed');
+    setTimeout(()=>el.focus(), 20);
     return true;
   } catch (err) {
-    console.error('[TE] Twitter replacement error', err);
+    console.error('[TE] twitterRewrite failed:', err);
     return false;
   }
 }
-
 
 function replaceInstagramEditable(el, newText) {
   if (!el) return;
@@ -419,50 +375,6 @@ function replaceInstagramEditable(el, newText) {
   }
 
   console.log('Instagram text injected');
-}
-
-// Show copy notification
-function showCopyNotification() {
-  const notification = document.createElement('div');
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
-    z-index: 2147483647;
-    opacity: 0;
-    transform: translateX(100%);
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  `;
-  notification.innerHTML = '✅ Copied to clipboard!';
-  
-  document.body.appendChild(notification);
-  
-  // Animate in
-  requestAnimationFrame(() => {
-    notification.style.opacity = '1';
-    notification.style.transform = 'translateX(0)';
-  });
-  
-  // Remove after 3 seconds
-  setTimeout(() => {
-    notification.style.opacity = '0';
-    notification.style.transform = 'translateX(100%)';
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
-      }
-    }, 300);
-  }, 3000);
 }
 
 // Function to set text in the focused element
@@ -659,13 +571,24 @@ async function enhanceText() {
     const url = window.location.href;
     const pageTitle = document.title;
     const contextType = detectContextType(url, pageTitle);
+    // Detect platform (twitter, instagram, whatsapp) for platform-specific prompt
+    const host = location.hostname;
+    let platformType = null;
+    if (/^(?:www\.)?(?:x|twitter)\.com$/i.test(host)) {
+      platformType = 'twitter';
+    } else if (/^(?:www\.)?instagram\.com$/i.test(host)) {
+      platformType = 'instagram';
+    } else if (/whatsapp\.com$/i.test(host)) {
+      platformType = 'whatsapp';
+    }
     
     // Send message to background script to enhance text
     chrome.runtime.sendMessage(
       {
         action: 'enhance-text-with-gemini',
         text,
-        context: contextType
+        context: contextType,
+        platform: platformType
       },
       (response) => {
         if (response && response.success) {
@@ -1553,6 +1476,7 @@ function showCustomPromptPopup() {
 
 // Function to show context enhancer popup
 function showContextEnhancerPopup() {
+  addContextEnhancerStyles()
   // Create popup container
   const popup = document.createElement('div');
   popup.className = 'text-enhancer-context-popup';
@@ -1968,9 +1892,6 @@ function addContextEnhancerStyles() {
 
 
 
-
-
-
 const originalTextMap = new WeakMap(); // store original text per element for revert
 let teTargetEl = null; // currently focused editable element for inline toolbar
 
@@ -2157,9 +2078,19 @@ function revertAction(){
 // Injected when an editable element gains focus. Provides UI for users who
 // don’t want to remember shortcuts.
 (function initQuickActions(){
+  // Do not show the floating pencil on platforms where it interferes (WhatsApp, Instagram, X/Twitter)
+  const blockedHosts = /(web\.whatsapp\.com|whatsapp\.com|instagram\.com|(?:x|twitter)\.com)$/i;
+  if (blockedHosts.test(location.hostname)) {
+    return; // skip quick-action UI entirely
+  }
   let qaButton = null; // floating pencil button
   let qaMenu   = null; // options container
   let currentEl = null; // currently-focused editable
+  // ---- Drag state ----
+  let dragging  = false;
+  let dragOffX  = 0;
+  let dragOffY  = 0;
+  let manualPos = false; // true once user drags – disable auto reposition
 
   function injectStyles(){
     if (document.getElementById('te-quick-style')) return;
@@ -2179,11 +2110,12 @@ function revertAction(){
     qaButton?.remove();
     qaMenu?.remove();
     qaButton = qaMenu = currentEl = null;
+    manualPos = false; // reset manual positioning when button removed
     document.removeEventListener('scroll', reposition, true);
   }
 
   function reposition(){
-    if(!qaButton || !currentEl) return;
+    if(!qaButton || !currentEl || manualPos) return;
     const r = currentEl.getBoundingClientRect();
     qaButton.style.top  = `${window.scrollY + r.top - 26}px`;
     qaButton.style.left = `${window.scrollX + r.right - 10}px`;
@@ -2194,46 +2126,22 @@ function revertAction(){
   }
 
   function showMenu(){
-    if(qaMenu){ qaMenu.remove(); qaMenu=null; return; }
+  if(qaMenu){ qaMenu.remove(); qaMenu=null; return; }
+  const positionMenu = () => {
+    if(!qaButton || !qaMenu) return;
+    qaMenu.style.top  = `${parseFloat(qaButton.style.top)+24}px`;
+    qaMenu.style.left = qaButton.style.left;
+  };
     qaMenu = document.createElement('div');
     qaMenu.className = 'te-qa-menu';
     const actions=[
       {label:'Quick Enhance', key:'quick'},
       {label:'Custom Prompt', key:'custom'},
-      {label:'Context Generator', key:'context'},
+      {label:'AI Write', key:'aiwrite'},
     ];
     // helper to insert enhanced text
     let lastOriginalText='';
-    function showRevertBar(enhancedText){
-      if(document.querySelector('.te-revert-bar')) return;
-      const bar=document.createElement('div');
-      bar.className='te-revert-bar';
-      bar.style=`position:absolute;z-index:2147483647;background:linear-gradient(135deg,#4c4b8e,#6d57a5);color:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.2);padding:6px 10px;font-size:12px;font-family:sans-serif;display:flex;gap:8px;align-items:center;cursor:move;user-select:none;`;
-      const undoBtn=document.createElement('button');undoBtn.textContent='Undo';
-      const regenBtn=document.createElement('button');regenBtn.textContent='Regenerate';
-      const closeBtn=document.createElement('span');closeBtn.textContent='✕';closeBtn.style.cursor='pointer';closeBtn.style='color:#fff; font-weight:bold;'
-      [undoBtn,regenBtn].forEach(b=>{b.style='padding:2px 6px;font-size:12px;'});
-      bar.appendChild(undoBtn);bar.appendChild(regenBtn);bar.appendChild(closeBtn);
-      document.body.appendChild(bar);
-      function place(){
-        const rect=currentEl.getBoundingClientRect();
-        document.body.appendChild(bar); // ensure offsetHeight known
-        const belowTop = window.scrollY + rect.bottom + 6;
-        const aboveTop = window.scrollY + rect.top - bar.offsetHeight - 6;
-        const topPos = aboveTop > 0 ? aboveTop : belowTop;
-        bar.style.top = `${topPos}px`;
-        bar.style.left = `${window.scrollX + rect.left}px`;
-      }
-      place();
-      undoBtn.onclick=()=>{insertEnhanced(lastOriginalText); bar.remove();};
-      regenBtn.onclick=()=>{showToast('Regenerating...','info',0); safeSend({action:'enhance-text', text:lastOriginalText},res=>{if(res&&res.success){insertEnhanced(res.enhancedText);showToast('Inserted ✅','info',2000);}else{showToast(res.error||'Enhancement failed','error',3000);} });};
-      closeBtn.onclick=()=>bar.remove();
-      // --- Dragging ---
-      let dragOffsetX=0, dragOffsetY=0, dragging=false;
-      bar.addEventListener('mousedown',e=>{dragging=true; dragOffsetX=e.clientX-parseInt(bar.style.left); dragOffsetY=e.clientY-parseInt(bar.style.top); e.preventDefault();});
-      document.addEventListener('mousemove',e=>{if(!dragging) return; bar.style.left=`${e.clientX-dragOffsetX}px`; bar.style.top=`${e.clientY-dragOffsetY}px`;});
-      document.addEventListener('mouseup',()=>{dragging=false;});
-    }
+   
 
     function insertEnhanced(text){
       if(!currentEl) return;
@@ -2263,94 +2171,137 @@ function revertAction(){
           currentEl.focus();
         } else if(key==='custom'){
           // replace button set with inline textarea for custom prompt
-          qaMenu.innerHTML = '';
-          const container = document.createElement('div');
-          container.style.background = '#232336';
-          container.style.color = '#fff';
-          container.style.padding = '8px';
-          container.style.borderRadius = '8px';
-          container.style.display = 'flex';
-          container.style.flexDirection = 'column';
-          container.style.gap = '6px';
+          qaMenu.innerHTML='';
+          const container=document.createElement('div');
+          container.style.background='#232336';
+          container.style.color='#fff';
+          container.style.padding='8px';
+          container.style.borderRadius='8px';
+          container.style.display='flex';
+          container.style.flexDirection='column';
+          container.style.gap='6px';
 
-          const textarea = document.createElement('textarea');
-          textarea.rows = 3;
-          textarea.placeholder = "Describe how you'd like it enhanced...";
-          textarea.className = 'text-enhancer-textarea';
-          textarea.style.width = '220px';
-          textarea.style.fontSize = '12px';
-          textarea.style.background = '#1c1c2b';
-          textarea.style.color = '#fff';
-          textarea.style.border = '1px solid #444';
-          textarea.style.borderRadius = '4px';
-          textarea.style.padding = '4px 6px';
+          const textarea=document.createElement('textarea');
+          textarea.rows=3;
+          textarea.placeholder='Describe how you\'d like it enhanced...';
+          textarea.className='text-enhancer-textarea';
+          textarea.style.width='220px';
+          textarea.style.fontSize='12px';
+          textarea.style.background='#1c1c2b';
+          textarea.style.color='#fff';
+          textarea.style.border='1px solid #444';
+          textarea.style.borderRadius='4px';
+          textarea.style.padding='4px 6px';
 
-          const enhanceBtn = document.createElement('button');
-          enhanceBtn.style.padding = '4px 8px';
-          enhanceBtn.style.fontSize = '12px';
-          enhanceBtn.style.display = 'flex';
-          enhanceBtn.style.alignItems = 'center';
-          enhanceBtn.style.gap = '4px';
-          enhanceBtn.style.background = '#4c4b8e';
-          enhanceBtn.style.color = '#fff';
-          enhanceBtn.style.border = 'none';
-          enhanceBtn.style.borderRadius = '4px';
-          const img = document.createElement('img');
-          img.alt = 'Enhance';
-          img.style.width = '14px';
-          img.style.height = '14px';
-          img.style.objectFit = 'contain';
-          img.src = chrome.runtime.getURL('logo.png');
-          img.onerror = () => {
-            img.onerror = null;
-            img.src = chrome.runtime.getURL('Pen.png');
-            img.onerror = () => {
-              enhanceBtn.textContent = 'Enhance';
-            };
-          };
+          const enhanceBtn=document.createElement('button');
+          enhanceBtn.style.padding='4px 8px';
+          enhanceBtn.style.fontSize='12px';
+          enhanceBtn.style.display='flex';
+          enhanceBtn.style.alignItems='center';
+          enhanceBtn.style.gap='4px';
+          enhanceBtn.style.background='#4c4b8e';
+          enhanceBtn.style.color='#fff';
+          enhanceBtn.style.border='none';
+          enhanceBtn.style.borderRadius='4px';
+          const img=document.createElement('img');
+          img.alt='Enhance';
+          img.style.width='14px';
+          img.style.height='14px';
+          img.style.objectFit='contain';
+          img.src=chrome.runtime.getURL('/icons/logo.png');
+          img.onerror=()=>{img.onerror=null;img.onerror=()=>{enhanceBtn.textContent='Enhance';};};
           enhanceBtn.appendChild(img);
 
           // If image fails so quickly that onerror triggers before append, ensure fallback handled
-          if (!img.complete) {
-            img.onload = () => {};
-          }
+          if(!img.complete){img.onload=()=>{};}
 
           // click handler
-          enhanceBtn.addEventListener('click', () => {
-            const prompt = textarea.value.trim();
-            if (!prompt) return;
-            const text = getTextFromFocusedElement(currentEl);
-            showToast('Enhancing...', 'info', 0);
-            safeSend({ action: 'custom-prompt', customPrompt: prompt, text }, (res) => {
-              if (res && res.success) {
-                insertEnhanced(res.enhancedText);
-                showToast('Inserted ✅', 'info', 2000);
-              } else {
-                showToast(res.error || 'Enhancement failed', 'error', 3000);
-              }
-              if(currentEl && typeof currentEl.focus==='function'){ currentEl.focus(); }
+          enhanceBtn.addEventListener('click',()=>{
+            const prompt=textarea.value.trim();
+            if(!prompt) return;
+            let text = getTextFromFocusedElement(currentEl);
+            if(!text) text = ' ';
+            showToast('Enhancing...','info',0);
+            safeSend({action:'custom-prompt', customPrompt: prompt, text}, (res)=>{
+              if(res&&res.success){insertEnhanced(res.enhancedText);showToast('Enhanced ✅','info',2000);}
+              else{showToast(res.error||'Enhancement failed','error',3000);}
+              if(currentEl&&typeof currentEl.focus==='function'){currentEl.focus();}
               removeQA();
             });
           });
 
           // enter key to trigger
-          textarea.addEventListener('keydown', (ev)=>{
-            if(ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); enhanceBtn.click(); }
+          textarea.addEventListener('keydown',(ev)=>{
+            if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();enhanceBtn.click();}
           });
 
           container.appendChild(textarea);
           container.appendChild(enhanceBtn);
           qaMenu.appendChild(container);
           textarea.focus();
-        } else if(key==='context'){
-          const text = getTextFromFocusedElement(currentEl);
-          chrome.runtime.sendMessage({action:'context-enhancer', text});
-          removeQA();
+        } else if(key==='aiwrite'){
+          // Ask AI: arbitrary request
+          qaMenu.innerHTML='';
+          const container=document.createElement('div');
+          container.style.background='#232336';
+          container.style.color='#fff';
+          container.style.padding='8px';
+          container.style.borderRadius='8px';
+          container.style.display='flex';
+          container.style.flexDirection='column';
+          container.style.gap='6px';
+
+          const textarea=document.createElement('textarea');
+          textarea.rows=3;
+          textarea.placeholder='Ask AI to write something...';
+          textarea.style.width='220px';
+          textarea.style.fontSize='12px';
+          textarea.style.background='#1c1c2b';
+          textarea.style.color='#fff';
+          textarea.style.border='1px solid #444';
+          textarea.style.borderRadius='4px';
+          textarea.style.padding='4px 6px';
+
+          const askBtn=document.createElement('button');
+          askBtn.textContent='Ask';
+          askBtn.style.padding='4px 8px';
+          askBtn.style.fontSize='12px';
+          askBtn.style.background='#4c4b8e';
+          askBtn.style.color='#fff';
+          askBtn.style.border='none';
+          askBtn.style.borderRadius='4px';
+
+          askBtn.addEventListener('click',()=>{
+            const query=textarea.value.trim();
+            if(!query) return;
+            showToast('Asking AI...','info',0);
+            safeSend({action:'ai-write', prompt: query},res=>{
+              if(res && res.success){
+                insertEnhanced(res.generatedText||res.enhancedText||'');
+                showToast('Enhanced ✅','info',2000);
+              }else{
+                showToast(res?.error||'AI request failed','error',3000);
+              }
+              if(currentEl && typeof currentEl.focus==='function'){currentEl.focus();}
+              removeQA();
+            });
+          });
+          // enter key support
+          textarea.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();askBtn.click();}});
+
+          container.appendChild(textarea);
+          container.appendChild(askBtn);
+          qaMenu.appendChild(container);
+          textarea.focus();
         }
       });
       qaMenu.appendChild(b);
     });
     document.body.appendChild(qaMenu);
+  // Position menu relative to pencil
+  positionMenu();
+    // ensure correct positioning immediately
+    reposition();
     reposition();
   }
 
@@ -2359,10 +2310,30 @@ function revertAction(){
     currentEl = target;
     injectStyles();
     qaButton = document.createElement('div');
+    qaButton.setAttribute('tabindex','-1');
     qaButton.className = 'te-qa-btn';
     qaButton.style='padding:2px;';
     qaButton.textContent = '✏'  ; // insert the image Pen from public folder // pencil icon, light-weight; swapable later
     qaButton.addEventListener('click', showMenu);
+  // ---- Drag handlers ----
+  qaButton.addEventListener('mousedown', (e) => {
+    if(e.button !== 0) return; // only left click
+    dragging = true;
+    dragOffX = e.clientX - qaButton.getBoundingClientRect().left;
+    dragOffY = e.clientY - qaButton.getBoundingClientRect().top;
+    manualPos = true;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    qaButton.style.left = `${e.clientX - dragOffX}px`;
+    qaButton.style.top  = `${e.clientY - dragOffY}px`;
+    if(qaMenu){
+      qaMenu.style.top  = `${parseFloat(qaButton.style.top) + 24}px`;
+      qaMenu.style.left = qaButton.style.left;
+    }
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
     document.body.appendChild(qaButton);
     reposition();
     // cleanup on scroll; focus change handled globally via focusin
