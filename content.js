@@ -412,6 +412,7 @@ function twitterRewrite(el, newText) {
     return false;
   }
 }
+
 function replaceInstagramEditable(el, newText) {
   if (!el) return;
   el.focus();

@@ -1,4 +1,18 @@
+// Review / Feedback popup helper
+// ----- Global toast -----
+const teToast = document.createElement('div');
+teToast.style.cssText = 'position:fixed;bottom:80px;right:24px;padding:10px 14px;background:#16a34a;color:#fff;border-radius:8px;font-size:13px;font-family:Inter, sans-serif;opacity:0;transition:opacity .3s;z-index:100001;pointer-events:none;';
+document.body.appendChild(teToast);
+function showToast(msg, isError = false) {
+  teToast.textContent = msg;
+  teToast.style.background = isError ? '#dc2626' : '#16a34a';
+  teToast.style.opacity = '1';
+  setTimeout(() => {
+    teToast.style.opacity = '0';
+  }, 3000);
+}
 
+let useCount = 0;
 const SUPPORT_MESSAGES = [
     "✨ Enjoying ToneGenie? A kind review would mean a lot!",
     "☕ Like the tool? Buy me a coffee & keep it alive!",
@@ -34,7 +48,9 @@ const SUPPORT_MESSAGES = [
 
   function incrementUsageCountAndMaybePrompt() {
   
-    chrome.storage.local.get('Feedback_Submitted',function(response){
+    chrome.storage.local.get(['Feedback_Submitted','textEnhancerUsage'], function (resp) {
+      if (resp.Feedback_Submitted) return; // already reviewed
+      useCount = resp.textEnhancerUsage || 0;
      
         
         useCount += 1;
@@ -60,12 +76,17 @@ const SUPPORT_MESSAGES = [
     const stars = document.createElement('div');
     stars.className = 'text-enhancer-stars';
     stars.style.cssText='display:flex;gap:6px;margin-bottom:12px;';
+    let rating = 0;
     for (let i = 1; i <= 5; i++) {
       const star = document.createElement('button');
       star.className = 'text-enhancer-star-btn';
       star.textContent = '★';
       star.style.cssText = 'background:transparent;border:none;font-size:24px;cursor:pointer;color:#6b7280;transition:color 0.2s;';
       star.onclick = () => {
+        rating = i; // capture selected rating
+        // reset all stars first
+        Array.from(stars.children).forEach(btn => (btn.style.color = '#6b7280'));
+        // highlight up to the selected one
         for (let j = 1; j <= i; j++) {
           stars.children[j - 1].style.color = '#facc15';
         }
@@ -86,8 +107,9 @@ const SUPPORT_MESSAGES = [
     btn.textContent = 'Share'
     btn.style.cssText = 'display:block;width:100%;padding:10px 12px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-weight:600;cursor:pointer;';
     btn.onclick = () => {
-        SubmitReview(); 
-      chrome.storage.local.set({ textEnhancerReviewed: true });
+        SubmitReview(rating, review.value.trim());
+
+      chrome.storage.local.set({ Feedback_Submitted: true });
       popup.remove();
     };
   
@@ -97,9 +119,43 @@ const SUPPORT_MESSAGES = [
     later.onclick = () => popup.remove();
     popup.appendChild(btn);
     popup.appendChild(later);
-  
+
     document.body.appendChild(popup);
   }
+
+async function SubmitReview(rating, feedbackText) {
+  try {
+    if (!rating && !feedbackText) { showToast('Please add rating or comment', true); return; }
+    const payload = {
+      stars: rating || 0,
+      comment: feedbackText || '',
+      extVersion: chrome.runtime?.getManifest?.().version || 'dev',
+      ua: navigator.userAgent
+    };
+    // Replace with your actual Firebase project endpoint
+    const API_URL = 'https://tone-genie.vercel.app/api/review';
+    const res = await fetch(API_URL, {
+      mode: 'no-cors',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    // In no-cors mode the response is opaque. Treat it as success.
+    if (res.ok || res.type === 'opaque') {
+      showToast('Thanks! We got your feedback.');
+    } else {
+      console.error('Failed to submit feedback:', res.status);
+      showToast('Sorry — couldn’t send your feedback (our fault).', true);
+    }
+  } catch (err) {
+    console.error('Failed to submit feedback:', err);
+    showToast('Sorry — couldn’t send your feedback (our fault).', true);
+  }
+}
+
+// Expose helpers for manual testing (e.g. run in console)
+window.showTextEnhancerReviewPopup = showReviewPopup;
+window.incrementTEUsage = incrementUsageCountAndMaybePrompt;
 
 export default incrementUsageCountAndMaybePrompt;
 
