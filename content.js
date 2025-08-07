@@ -303,6 +303,46 @@ function forceReactSync(element, newText) {
     element.dispatchEvent(new Event(eventType, { bubbles: true }));
   });
 }
+function newTwitterReplace(el, newText) {
+  if (!el) return false;
+  try {
+    // 1. Determine the editable root (div[role="textbox"]) if given element is a span
+    const textbox = el.closest('[role="textbox"]') || el;
+    textbox.focus();
+
+    // 2. Clear existing content via keyboard simulation so DraftJS & React state reset
+    dispatchKeystroke(textbox, 'a', 'KeyA', true); // Ctrl/⌘ + A
+    dispatchKeystroke(textbox, 'Backspace', 'Backspace');
+
+    // 3. Paste newText via clipboard event – Twitter listens for paste to update state
+    const dt = new DataTransfer();
+    dt.setData('text/plain', newText);
+    textbox.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+
+    // 4. Update hidden textarea (value prop) that actually gets submitted when posting
+    const ta = document.querySelector('textarea[data-testid^="tweetTextarea"]');
+    if (ta) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+      if (setter) setter.call(ta, newText); else ta.value = newText;
+      ['input','change'].forEach(evt => ta.dispatchEvent(new Event(evt, { bubbles: true })));
+    }
+
+    // 5. Ensure caret at end for user convenience
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      const rangeEnd = document.createRange();
+      rangeEnd.selectNodeContents(textbox);
+      rangeEnd.collapse(false);
+      sel.addRange(rangeEnd);
+    }
+    textbox.focus();
+    return true;
+  } catch(err) {
+    console.error('[TE] newTwitterReplace failed', err);
+    return false;
+  }
+}
 
 function twitterRewrite(el, newText) {
   if (!el) return false;
@@ -415,30 +455,23 @@ function twitterRewrite(el, newText) {
 
 function replaceInstagramEditable(el, newText) {
   if (!el) return;
-  el.focus();
-  // Select all existing content
-  const sel = window.getSelection();
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  sel.removeAllRanges();
-  sel.addRange(range);
+  try {
+    // Prefer innermost span inside a <p> to prevent duplicated nodes
+    let target = el.querySelector && el.querySelector('p span') ? el.querySelector('p span') : el;
+    target.focus();
+    // Clear existing content via keystroke simulation so Lexical resets fully
+    dispatchKeystroke(target, 'a', 'KeyA', true); // Ctrl/⌘ + A
+    dispatchKeystroke(target, 'Backspace', 'Backspace');
 
-  // Clear existing content via real user-like keystrokes so Lexical truly empties
-  dispatchKeystroke(el, 'a', 'KeyA', true); // Ctrl/⌘ + A
-  dispatchKeystroke(el, 'Backspace', 'Backspace');
-
-  // Now insert once via execCommand – Lexical will translate this into its model
-  const ok = document.execCommand('insertText', false, newText);
-  console.debug('Instagram replace execCommand after keystroke clear', ok, el);
-
-  if (!ok) {
-    // As last resort: paste
+    // Paste the new text – Instagram listens for paste events
     const dt = new DataTransfer();
     dt.setData('text/plain', newText);
-    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
-  }
+    target.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
 
-  console.log('Instagram text injected');
+    console.log('[TE] Instagram text injected via paste to span');
+  } catch (err) {
+    console.warn('[TE] replaceInstagramEditable error', err);
+  }
 }
 
 // Function to set text in the focused element
@@ -2136,35 +2169,12 @@ function findPlatformEditable(node) {
   } 
   return null;
 }
-function quickEnhanceAction(){
-  if(!teTargetEl)return;
-  const txt = getTextFromFocusedElement(teTargetEl) || '';
-  originalTextMap.set(teTargetEl, txt);
-
-  // ensure target is focused for enhanceText flow
-  teTargetEl.focus();
-  enhanceText();
-}
-function revertAction(){
-  if(!teTargetEl)return;
-  const orig = originalTextMap.get(teTargetEl);
-  if(orig!==undefined){
-    setTextInFocusedElement(teTargetEl, orig);
-    showToast('Reverted to original text','info');
-  } else {
-    showToast('No original text stored','error');
-  }
-}
 
 // -------------------- QUICK-ACTION FLOATING BUTTON --------------------
 // Injected when an editable element gains focus. Provides UI for users who
 // don’t want to remember shortcuts.
 (function initQuickActions(){
-  // Do not show the floating pencil on platforms where it interferes (WhatsApp, Instagram, X/Twitter)
-  const blockedHosts = /(web\.whatsapp\.com|whatsapp\.com|instagram\.com|(?:x|twitter)\.com)$/i;
-  if (blockedHosts.test(location.hostname)) {
-    return; // skip quick-action UI entirely
-  }
+  // Do not show the floating pencil on platforms where it inter
   let qaButton = null; // floating pencil button
   let qaMenu   = null; // options container
   let currentEl = null; // currently-focused editable
@@ -2173,7 +2183,13 @@ function revertAction(){
   let dragOffX  = 0;
   let dragOffY  = 0;
   let manualPos = false; // true once user drags – disable auto reposition
-
+  function safeGetURL(path) {
+    if (chrome?.runtime?.id && chrome?.runtime?.getURL) {
+      try { return chrome.runtime.getURL(path); } catch { /* ignore */ }
+    }
+    // Context gone – return relative path
+    return `/${path.replace(/^\/+/, '')}`;
+  }
   function injectStyles(){
     if (document.getElementById('te-quick-style')) return;
     const s = document.createElement('style');
@@ -2225,16 +2241,53 @@ function revertAction(){
     let lastOriginalText='';
    
 
+    // helper: simulate keystrokes & paste for WhatsApp reliable insertion
+    function replaceViaKeystrokes(el, txt){
+      if(!el) return;
+      try{
+        el.focus();
+        // Clear existing content via keyboard shortcuts so WhatsApp's Lexical editor resets its internal model.
+        dispatchKeystroke(el, 'a', 'KeyA', true); // Ctrl/⌘ + A (select all)
+        dispatchKeystroke(el, 'Backspace', 'Backspace'); // delete selection
+
+        // Always paste – WhatsApp relies on paste events for proper insertion.
+        const dt = new DataTransfer();
+        dt.setData('text/plain', txt);
+        el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, clipboardData: dt }));
+      }catch(err){
+        console.warn('[TE] replaceViaKeystrokes error', err);
+      }
+    }
+
     function insertEnhanced(text){
       if(!currentEl) return;
       lastOriginalText = getTextFromFocusedElement(currentEl);
-      if(window.EditableHelper && typeof EditableHelper.replaceText==='function'){
-        try{ EditableHelper.replaceText(currentEl, text); }catch(e){}
-      }else if(currentEl.value!==undefined){ currentEl.value = text; }
-      else { currentEl.innerText = text; }
-      ['input','change'].forEach(evt=>{ currentEl.dispatchEvent(new Event(evt,{bubbles:true})); });
+      const host = location.hostname;
+      try {
+        if (host.endsWith('whatsapp.com')) {
+          // WhatsApp Web requires keystroke simulation for reliable insertion
+          replaceViaKeystrokes(currentEl, text);
+        } else if (host.endsWith('instagram.com')) {
+          // Instagram DM or comment box – needs its own keystroke+paste routine
+          replaceInstagramEditable(currentEl, text);
+        } else if (host.endsWith('x.com') || host.endsWith('twitter.com')) {
+          // Twitter/X compose box – keystroke + paste replacement
+          newTwitterReplace(currentEl, text);
+        } else if (window.EditableHelper && typeof EditableHelper.replaceText === 'function') {
+          EditableHelper.replaceText(currentEl, text);
+        } else if (currentEl.value !== undefined) {
+          currentEl.value = text;
+        } else {
+          currentEl.innerText = text;
+        }
+      } catch (err) {
+        console.error('[TE] insertEnhanced failed', err);
+        // Fallback: attempt keystroke simulation if direct replacement fails
+        try { replaceViaKeystrokes(currentEl, text); } catch (_) {}
+      }
+      ['input','change'].forEach(evt => currentEl.dispatchEvent(new Event(evt, { bubbles: true })));
       // success feedback
-      showToast('Enhanced ☑️','info',2000);    
+      showToast('Enhanced ☑️', 'info', 2000);
     }
 
     actions.forEach(({label,key})=>{
@@ -2355,6 +2408,7 @@ function revertAction(){
           askBtn.addEventListener('click',()=>{
             const query=textarea.value.trim();
             if(!query) return;
+            const PromptSend = query + ' ' + 'Write thing in human tone and make sure to keep it simple and not to use  hard words or fancy words unless asked!';
             showToast('Asking AI...','info',0);
             safeSend({action: 'ai-write', customPrompt: query, text: '', includeEmojis: false}, res => {
               if(res && res.success){
@@ -2386,40 +2440,53 @@ function revertAction(){
     reposition();
   }
 
-  function createButton(target){
-    removeQA();
-    currentEl = target;
-    injectStyles();
-    qaButton = document.createElement('div');
-    qaButton.setAttribute('tabindex','-1');
-    qaButton.className = 'te-qa-btn';
-    qaButton.style='padding:2px;';
-    qaButton.textContent = '✏'  ; // insert the image Pen from public folder // pencil icon, light-weight; swapable later
-    qaButton.addEventListener('click', showMenu);
-  // ---- Drag handlers ----
-  qaButton.addEventListener('mousedown', (e) => {
-    if(e.button !== 0) return; // only left click
-    dragging = true;
-    dragOffX = e.clientX - qaButton.getBoundingClientRect().left;
-    dragOffY = e.clientY - qaButton.getBoundingClientRect().top;
-    manualPos = true;
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', (e) => {
-    if(!dragging) return;
-    qaButton.style.left = `${e.clientX - dragOffX}px`;
-    qaButton.style.top  = `${e.clientY - dragOffY}px`;
-    if(qaMenu){
-      qaMenu.style.top  = `${parseFloat(qaButton.style.top) + 24}px`;
-      qaMenu.style.left = qaButton.style.left;
-    }
-  });
-  document.addEventListener('mouseup', () => { dragging = false; });
-    document.body.appendChild(qaButton);
-    reposition();
-    // cleanup on scroll; focus change handled globally via focusin
-    document.addEventListener('scroll', reposition, true);
-  }
+function createButton(target){
+removeQA();
+currentEl = target;
+const imgPen = document.createElement('img');
+try {
+imgPen.src = safeGetURL('/icons/Pen.png');
+} catch (err) {
+// Fallback if extension context is invalidated (e.g. after reload)
+console.warn('[TE] getURL failed – using relative path', err);
+imgPen.src = '/icons/Pen.png';
+}
+imgPen.style.width = '16px';
+imgPen.style.height = '16px';
+imgPen.style.objectFit = 'contain';
+imgPen.style.display = 'block';
+injectStyles();
+qaButton = document.createElement('div');
+qaButton.setAttribute('tabindex','-1');
+qaButton.className = 'te-qa-btn';
+qaButton.style='padding:2px;';
+qaButton.appendChild(imgPen);
+qaButton.addEventListener('click', showMenu);
+// ---- Drag handlers ----
+qaButton.addEventListener('mousedown', (e) => {
+if(e.button !== 0) return; // only left click
+dragging = true;
+dragOffX = e.clientX - qaButton.getBoundingClientRect().left;
+dragOffY = e.clientY - qaButton.getBoundingClientRect().top;
+manualPos = true;
+e.preventDefault();
+});
+document.addEventListener('mousemove', (e) => {
+if(!dragging) return;
+qaButton.style.left = `${e.clientX - dragOffX}px`;
+qaButton.style.top  = `${e.clientY - dragOffY}px`;
+if(qaMenu){
+qaMenu.style.top  = `${parseFloat(qaButton.style.top) + 24}px`;
+qaMenu.style.left = qaButton.style.left;
+}
+});
+document.addEventListener('mouseup', () => { dragging = false; });
+document.body.appendChild(qaButton);
+reposition();
+// cleanup on scroll; focus change handled globally via focusin
+document.addEventListener('scroll', reposition, true);
+}
+/* duplicate block removed */
 
   document.addEventListener('focusin', (e)=>{
     const el = e.target;
